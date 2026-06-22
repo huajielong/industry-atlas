@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>量子科技 · 标的公司气泡图</title>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#070A15;font-family:'PingFang SC','Microsoft YaHei','Noto Sans SC',-apple-system,BlinkMacSystemFont,sans-serif;overflow:hidden;color:#fff;user-select:none}
+#app{width:100vw;height:100vh;position:relative}
+#breadcrumb{position:absolute;top:14px;left:24px;z-index:20;font-size:12px;color:rgba(255,255,255,0.3);letter-spacing:1px;pointer-events:none}
+#breadcrumb span{color:rgba(96,165,250,0.5)}
+#header{position:absolute;top:42px;left:50%;transform:translateX(-50%);text-align:center;z-index:20;pointer-events:none}
+#header h1{font-size:24px;font-weight:700;letter-spacing:3px;background:linear-gradient(135deg,#60A5FA 0%,#A78BFA 50%,#60A5FA 100%);background-size:200% 200%;-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;animation:shimmer 4s ease-in-out infinite}
+@keyframes shimmer{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
+#header .subtitle{font-size:12px;color:rgba(255,255,255,0.35);letter-spacing:4px;margin-top:2px}
+#header .subtitle span{color:rgba(96,165,250,0.5)}
+#tooltip{position:absolute;z-index:100;background:rgba(7,10,21,0.94);backdrop-filter:blur(14px);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:16px 22px;pointer-events:none;opacity:0;transition:opacity 0.25s;box-shadow:0 12px 48px rgba(0,0,0,0.7);min-width:200px;max-width:300px}
+#tooltip.visible{opacity:1}
+#tooltip .name{font-size:16px;font-weight:600;color:#fff;letter-spacing:1px}
+#tooltip .group{font-size:11px;letter-spacing:2px;margin-top:2px}
+#tooltip .desc{font-size:11px;color:rgba(255,255,255,0.35);margin-top:6px;padding-top:6px;border-top:1px solid rgba(255,255,255,0.06)}
+#tooltip .scores{margin-top:10px}
+#tooltip .score-row{display:flex;justify-content:space-between;font-size:12px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.04)}
+#tooltip .score-row:last-child{border-bottom:none}
+#tooltip .score-row .label{color:rgba(255,255,255,0.45)}
+#tooltip .score-row .value{color:rgba(255,255,255,0.85);font-weight:500;display:flex;align-items:center;gap:6px}
+#tooltip .score-row .bar-bg{width:60px;height:4px;background:rgba(255,255,255,0.08);border-radius:2px;display:inline-block}
+#tooltip .score-row .bar-fill{height:100%;border-radius:2px;display:block}
+#legend{position:absolute;bottom:24px;left:50%;transform:translateX(-50%);display:flex;gap:22px;z-index:15;pointer-events:none;flex-wrap:wrap;justify-content:center}
+.legend-item{display:flex;align-items:center;gap:7px;font-size:11px;color:rgba(255,255,255,0.6);letter-spacing:1px}
+.legend-dot{width:11px;height:11px;border-radius:50%;border:1px solid rgba(255,255,255,0.1);flex-shrink:0}
+#stats{position:absolute;bottom:60px;right:24px;z-index:10;text-align:right;pointer-events:none;opacity:0.3}
+#stats div{font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;line-height:1.5}
+@media(max-width:768px){#breadcrumb{top:8px;left:12px;font-size:10px}#header{top:30px}#header h1{font-size:17px;letter-spacing:1px}}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="breadcrumb"><span>●</span> 量子科技  /  核心硬件  /  <b style="color:rgba(255,255,255,0.6)">全球量子科技 · 标的公司</b></div>
+  <div id="header">
+    <h1>🔬 量子科技 · 全球标的公司战略价值</h1>
+    <div class="subtitle">量子计算 · 量子通信 · 量子传感 · <span>增长 × 盈利能力 × 壁垒</span></div>
+  </div>
+  <div id="graph"></div>
+  <div id="legend"></div>
+  <div id="stats"><div id="infoText"></div></div>
+  <div id="tooltip"><div class="name"></div><div class="group"></div><div class="scores"></div><div class="desc"></div></div>
+</div>
+<script>
+const COMPANIES=[
+  // ===== 国际量子计算巨头 =====
+  {id:'IBM Quantum',group:'国际巨头',color:'#0062FF',growth:75,profit:50,moat:92,desc:'超导路线领跑者，433量子比特Condor，Qiskit生态最成熟'},
+  {id:'Google Quantum',group:'国际巨头',color:'#4285F4',growth:82,profit:40,moat:88,desc:'2019量子优越性Sycamore，Willow 105量子比特，量子纠错领先'},
+  {id:'IonQ',group:'国际巨头',color:'#00A4EF',growth:88,profit:25,moat:75,desc:'离子阱路线上市公司，Forte 36算法量子比特，商用云接入'},
+  {id:'Quantinuum',group:'国际巨头',color:'#E60012',growth:85,profit:30,moat:78,desc:'Honeywell离子阱+H系列，56量子比特+全连接架构'},
+  {id:'Rigetti',group:'国际巨头',color:'#76217A',growth:65,profit:15,moat:55,desc:'超导量子处理器代工+云接入，84量子比特Ankaa'},
+  {id:'D-Wave',group:'国际巨头',color:'#008C45',growth:55,profit:20,moat:60,desc:'量子退火先行者，7000+量子比特Advantage，专精组合优化'},
+  // ===== 量子计算新势力 =====
+  {id:'PsiQuantum',group:'新势力',color:'#FF6B35',growth:80,profit:10,moat:70,desc:'光量子路线，百万量子比特目标，未上市但融资领先'},
+  {id:'Xanadu',group:'新势力',color:'#00B4D8',growth:78,profit:10,moat:62,desc:'光量子计算+PennyLane软件，光子聚类态方案'},
+  {id:'Alice & Bob',group:'新势力',color:'#E91E63',growth:72,profit:5,moat:58,desc:'猫量子比特方案，纠错开销最低，法国初创'},
+  {id:'Oxford Ionics',group:'新势力',color:'#9C27B0',growth:70,profit:5,moat:55,desc:'离子阱芯片化技术，高保真度量子门'},
+  // ===== 中国量子科技 =====
+  {id:'国盾量子',group:'中国量子',color:'#CF0A2C',growth:68,profit:45,moat:72,desc:'量子通信设备龙头，QKD/PQC，A股上市公司'},
+  {id:'本源量子',group:'中国量子',color:'#FF6A00',growth:82,profit:20,moat:78,desc:'国产超导量子计算机，悟空72量子比特，本源司南OS'},
+  {id:'国仪量子',group:'中国量子',color:'#0077B5',growth:75,profit:55,moat:70,desc:'量子精密测量+量子传感，钻石NV色心技术'},
+  {id:'国科量子',group:'中国量子',color:'#1E90FF',growth:65,profit:40,moat:65,desc:'量子通信网络运营，星地量子通信'},
+  {id:'华翊量子',group:'中国量子',color:'#6B21A8',growth:70,profit:10,moat:55,desc:'离子阱量子计算，清华大学背景，早期阶段'},
+  // ===== 供应链核心 =====
+  {id:'Bluefors',group:'供应链',color:'#00A3E0',growth:72,profit:65,moat:80,desc:'稀释制冷机全球垄断，量子计算必备低温设备'},
+  {id:'Keysight',group:'供应链',color:'#FEBE00',growth:55,profit:60,moat:65,desc:'量子测控设备+微波电子学，精密测量仪表'},
+  {id:'Oxford Instruments',group:'供应链',color:'#003A70',growth:50,profit:55,moat:60,desc:'低温超导磁体系统+纳米加工设备'},
+];
+const margin={top:90,right:60,bottom:75,left:75};const width=window.innerWidth;const height=window.innerHeight;
+const svg=d3.select('#graph').append('svg').attr('width',width).attr('height',height);const defs=svg.append('defs');
+const glow=defs.append('filter').attr('id','bGlow').attr('x','-30%').attr('y','-30%').attr('width','160%').attr('height','160%');
+glow.append('feGaussianBlur').attr('stdDeviation','3').attr('result','blur');glow.append('feMerge').append('feMergeNode').attr('in','blur');glow.append('feMerge').append('feMergeNode').attr('in','SourceGraphic');
+const bg=defs.append('linearGradient').attr('id','bg2').attr('x1','0%').attr('y1','0%').attr('x2','0%').attr('y2','100%');
+bg.append('stop').attr('offset','0%').attr('stop-color','#0A0E20');bg.append('stop').attr('offset','100%').attr('stop-color','#070A15');
+svg.append('rect').attr('width',width).attr('height',height).attr('fill','url(#bg2)');
+const pat=defs.append('pattern').attr('id','pat2').attr('width',40).attr('height',40).attr('patternUnits','userSpaceOnUse');
+pat.append('circle').attr('cx',20).attr('cy',20).attr('r',0.5).attr('fill','rgba(255,255,255,0.03)');
+svg.append('rect').attr('width',width).attr('height',height).attr('fill','url(#pat2)');
+const xS=d3.scaleLinear().domain([5,100]).range([margin.left,width-margin.right]);
+const yS=d3.scaleLinear().domain([5,100]).range([height-margin.bottom,margin.top]);
+const rS=d3.scaleSqrt().domain([40,100]).range([13,40]);
+[20,40,60,80].forEach(v=>{svg.append('line').attr('x1',xS(v)).attr('x2',xS(v)).attr('y1',yS(5)).attr('y2',yS(100)).attr('stroke','rgba(255,255,255,0.03)').attr('stroke-width',1);svg.append('line').attr('y1',yS(v)).attr('y2',yS(v)).attr('x1',xS(5)).attr('x2',xS(100)).attr('stroke','rgba(255,255,255,0.03)').attr('stroke-width',1);});
+const mX=xS(55),mY=yS(55);
+svg.append('line').attr('x1',mX).attr('x2',mX).attr('y1',yS(5)).attr('y2',yS(100)).attr('stroke','rgba(255,255,255,0.06)').attr('stroke-dasharray','6,4').attr('stroke-width',1);
+svg.append('line').attr('y1',mY).attr('y2',mY).attr('x1',xS(5)).attr('x2',xS(100)).attr('stroke','rgba(255,255,255,0.06)').attr('stroke-dasharray','6,4').attr('stroke-width',1);
+svg.append('text').text('盈利能力  →').attr('x',width/2).attr('y',height-14).attr('text-anchor','middle').attr('fill','rgba(255,255,255,0.25)').attr('font-size','12px').attr('letter-spacing','3px').attr('font-weight','300');
+svg.append('text').text('增长潜力  →').attr('y',height/2).attr('x',12).attr('text-anchor','middle').attr('fill','rgba(255,255,255,0.25)').attr('font-size','12px').attr('letter-spacing','3px').attr('font-weight','300').attr('transform',`rotate(-90,12,${height/2})`);
+[20,40,60,80].forEach(v=>{svg.append('text').text(`${v}`).attr('x',xS(v)).attr('y',height-margin.bottom+22).attr('text-anchor','middle').attr('fill','rgba(255,255,255,0.18)').attr('font-size','10px');svg.append('text').text(`${v}`).attr('y',yS(v)).attr('x',margin.left-18).attr('text-anchor','end').attr('dominant-baseline','middle').attr('fill','rgba(255,255,255,0.18)').attr('font-size','10px');});
+const qs=[{x:(55+100)/2,y:(100+55)/2,big:'🏆 龙头标的',small:'高增长·高利润·核心持仓',c:'rgba(245,158,11,0.45)',op:0.12},{x:(5+55)/2,y:(100+55)/2,big:'🚀 潜力新星',small:'高增长·待盈利·长期关注',c:'rgba(139,92,246,0.3)',op:0.08},{x:(55+100)/2,y:(55+5)/2,big:'🏦 护城河',small:'稳定盈利·格局成熟·防守配置',c:'rgba(52,211,153,0.3)',op:0.08},{x:(5+55)/2,y:(55+5)/2,big:'⏳ 观察区',small:'待验证·需跟踪',c:'rgba(255,100,100,0.2)',op:0.06}];
+qs.forEach(q=>{const g=svg.append('g').attr('opacity',q.op);g.append('text').text(q.big).attr('x',xS(q.x)).attr('y',yS(q.y)-10).attr('text-anchor','middle').attr('fill',q.c).attr('font-size','24px').attr('font-weight','700').attr('letter-spacing','3px');g.append('text').text(q.small).attr('x',xS(q.x)).attr('y',yS(q.y)+12).attr('text-anchor','middle').attr('fill',q.c).attr('font-size','11px').attr('font-weight','300').attr('letter-spacing','2px');});
+const tp=d3.select('#tooltip'),tpName=tp.select('.name'),tpGroup=tp.select('.group'),tpScores=tp.select('.scores'),tpDesc=tp.select('.desc');const bx=svg.append('g').attr('class','bx');
+const prime=COMPANIES.filter(d=>d.growth>=65&&d.profit>=65);
+const be=bx.selectAll('g').data(COMPANIES).join('g').attr('cursor','pointer');
+be.append('circle').attr('class','gr').attr('r',d=>rS(d.moat)+5).attr('fill',d=>d.color).attr('opacity',0.07).attr('filter','url(#bGlow)');
+be.append('circle').attr('class','bb').attr('r',d=>rS(d.moat)).attr('fill',d=>d.color).attr('opacity',d=>d.growth>=65&&d.profit>=65?0.85:0.6).attr('stroke',d=>d.growth>=65&&d.profit>=65?'#FFD700':d.color).attr('stroke-width',d=>d.growth>=65&&d.profit>=65?2.5:1.8).attr('stroke-opacity',d=>d.growth>=65&&d.profit>=65?0.6:0.35);
+be.append('circle').attr('class','hi').attr('r',d=>rS(d.moat)*0.28).attr('fill','#fff').attr('opacity',0.18).attr('cx',d=>-rS(d.moat)*0.25).attr('cy',d=>-rS(d.moat)*0.25);
+be.append('text').text(d=>d.id).attr('dx',0).attr('dy',d=>rS(d.moat)+14).attr('text-anchor','middle').attr('fill','rgba(255,255,255,0.75)').attr('font-size','11px').attr('font-weight','500').attr('letter-spacing','1px').attr('style','text-shadow:0 0 10px rgba(0,0,0,0.95);pointer-events:none;');
+be.attr('transform',d=>`translate(${xS(d.profit)},${yS(d.growth)})`);
+be.on('mouseenter',function(ev,d){const e=d3.select(this);e.select('.bb').transition().duration(200).attr('opacity',1).attr('r',rS(d.moat)*1.12);e.select('.gr').transition().duration(200).attr('opacity',0.2).attr('r',rS(d.moat)+10);e.raise();tpName.text(d.id);tpGroup.text(d.group).style('color',d.color);const bar=v=>{const w=Math.round(v/100*60),c=v>=70?'#34D399':v>=45?'#F9CA24':'#FF6B6B';return`<span class="bar-bg"><span class="bar-fill" style="width:${w}px;background:${c}"></span></span>`;};tpScores.html(`<div class="score-row"><span class="label">📈 增长潜力</span><span class="value">${d.growth}/100${bar(d.growth)}</span></div><div class="score-row"><span class="label">💰 盈利能力</span><span class="value">${d.profit}/100${bar(d.profit)}</span></div><div class="score-row"><span class="label">🏰 竞争壁垒</span><span class="value">${d.moat}/100${bar(d.moat)}</span></div>`);tpDesc.text(d.desc);tp.classed('visible',true).style('left',Math.min(ev.clientX+20,width-320)+'px').style('top',Math.max(ev.clientY-180,10)+'px');be.filter(function(){return this!==e.node();}).select('.bb').transition().duration(200).attr('opacity',0.15);be.filter(function(){return this!==e.node();}).select('text').transition().duration(200).attr('opacity',0.15);}).on('mousemove',function(ev){tp.style('left',Math.min(ev.clientX+20,width-320)+'px').style('top',Math.max(ev.clientY-180,10)+'px');}).on('mouseleave',function(){tp.classed('visible',false);be.select('.bb').transition().duration(300).attr('opacity',d=>d.growth>=65&&d.profit>=65?0.85:0.6).attr('r',d=>rS(d.moat));be.select('.gr').transition().duration(300).attr('opacity',0.07).attr('r',d=>rS(d.moat)+5);be.select('text').transition().duration(300).attr('opacity',1);});
+const lg=d3.select('#legend');
+[...new Set(COMPANIES.map(d=>d.group))].forEach(g=>{const c=COMPANIES.find(d=>d.group===g).color;lg.append('div').attr('class','legend-item').html(`<div class="legend-dot" style="background:${c}"></div><span>${g}</span>`);});
+document.getElementById('infoText').textContent=`${COMPANIES.length} 家标的 · 气泡=壁垒 · 金色描边=龙头 · 悬停看评分`;
+window.addEventListener('resize',()=>location.reload());
+console.log('✅ 量子科技标的公司气泡图已加载');
+console.log('🏆 龙头:',prime.map(d=>d.id).join(' · '));
+</script>
+</body>
+</html>

@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>量子科技 · 产业全景生态图</title>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#070A15;font-family:'PingFang SC','Microsoft YaHei','Noto Sans SC',-apple-system,sans-serif;overflow:hidden;color:#fff;user-select:none}
+#app{width:100vw;height:100vh;position:relative}
+#header{position:absolute;top:24px;left:50%;transform:translateX(-50%);text-align:center;z-index:10;pointer-events:none}
+#header h1{font-size:30px;font-weight:700;letter-spacing:4px;background:linear-gradient(135deg,#60A5FA 0%,#A78BFA 40%,#60A5FA 100%);background-size:200% auto;-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;animation:shimmer 4s ease-in-out infinite}
+@keyframes shimmer{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
+#header .subtitle{font-size:13px;color:rgba(255,255,255,0.4);letter-spacing:6px;margin-top:4px;font-weight:300}
+#header .subtitle span{color:rgba(96,165,250,0.5)}
+#graph{width:100%;height:100%}
+#graph svg{display:block}
+#legend{position:absolute;bottom:36px;left:50%;transform:translateX(-50%);display:flex;flex-wrap:wrap;justify-content:center;gap:10px 22px;z-index:10;pointer-events:none;max-width:90vw}
+.legend-item{display:flex;align-items:center;gap:6px;font-size:12px;color:rgba(255,255,255,0.7);letter-spacing:1px}
+.legend-dot{width:10px;height:10px;border-radius:50%;border:1px solid rgba(255,255,255,0.15);flex-shrink:0}
+#tooltip{position:absolute;z-index:100;background:rgba(7,10,21,0.92);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:14px 20px;pointer-events:none;opacity:0;transition:opacity 0.2s;box-shadow:0 8px 40px rgba(0,0,0,0.6);min-width:130px;text-align:center}
+#tooltip.visible{opacity:1}
+#tooltip .name{font-size:16px;font-weight:600;color:#fff}
+#tooltip .group{font-size:12px;color:rgba(255,255,255,0.5);margin-top:4px;letter-spacing:2px}
+#tooltip .badge{display:inline-block;padding:2px 12px;border-radius:20px;font-size:11px;margin-top:6px;letter-spacing:1px}
+#tooltip .badge.root-badge{background:rgba(255,215,0,0.2);color:#FFD700;border:1px solid rgba(255,215,0,0.3)}
+#tooltip .badge.cluster-badge{background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.7);border:1px solid rgba(255,255,255,0.1)}
+#stats{position:absolute;bottom:80px;right:28px;z-index:10;text-align:right;pointer-events:none;opacity:0.35}
+#stats div{font-size:12px;color:rgba(255,255,255,0.4);letter-spacing:1px;line-height:1.6}
+@media(max-width:768px){#header h1{font-size:20px;letter-spacing:2px}#header .subtitle{font-size:10px;letter-spacing:3px}#legend{gap:6px 14px;bottom:20px}.legend-item{font-size:10px}#stats{display:none}}
+@media(max-width:480px){#header h1{font-size:16px;letter-spacing:1px}#header{top:16px}}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="header">
+    <h1>🔬 量子科技 · 产业全景生态图</h1>
+    <div class="subtitle">QUANTUM TECHNOLOGY ECOSYSTEM · <span>构筑未来信息社会底层基石</span></div>
+  </div>
+  <div id="graph"></div>
+  <div id="legend"></div>
+  <div id="stats"><div id="nodeCount"></div><div id="linkCount"></div></div>
+  <div id="tooltip"><div class="name"></div><div class="group"></div><div class="badge"></div></div>
+</div>
+<script>
+const CLUSTERS=[
+  {id:'量子计算',color:'#60A5FA',desc:'通用量子计算机与专用量子处理器'},
+  {id:'量子通信',color:'#A78BFA',desc:'量子密钥分发与量子隐形传态'},
+  {id:'量子传感',color:'#34D399',desc:'超高精度量子测量与磁场/重力/惯性传感'},
+  {id:'量子精密测量',color:'#F59E0B',desc:'原子钟/量子基准/时间频率标准'},
+  {id:'量子模拟',color:'#F472B6',desc:'量子多体系统模拟与量子化学计算'},
+  {id:'量子软件',color:'#06B6D4',desc:'量子操作系统/编译器/算法库'},
+  {id:'量子安全',color:'#8B5CF6',desc:'后量子密码/PQC迁移/量子随机数'},
+  {id:'量子材料',color:'#EC4899',desc:'超导/拓扑/二维量子材料'},
+];
+const LEAF_NODES={
+  '量子计算':['超导量子比特','离子阱处理器','光量子计算','拓扑量子计算','量子纠错','量子优越性'],
+  '量子通信':['量子密钥分发-QKD','量子隐形传态','量子中继器','量子网络','星地量子通信','量子密码'],
+  '量子传感':['原子磁力计','量子重力仪','量子陀螺仪','NV色心传感','冷原子干涉','量子成像'],
+  '量子精密测量':['原子钟','量子电压基准','量子电流基准','时间频率传递','量子电阻标准','光频标'],
+  '量子模拟':['量子多体模拟','量子化学计算','量子优化','量子机器学习','量子蒙特卡洛','量子动力学'],
+  '量子软件':['量子操作系统','量子编译器','量子算法库','量子云平台','量子调试器','量子编程语言'],
+  '量子安全':['后量子密码PQC','量子随机数QRNG','量子加密协议','PQC迁移服务','量子身份认证','量子安全芯片'],
+  '量子材料':['超导材料','拓扑绝缘体','二维材料','量子点材料','石墨烯','Majorana费米子'],
+};
+const CROSS_LINKS=[
+  ['超导量子比特','超导材料'],['拓扑量子计算','拓扑绝缘体'],['光量子计算','量子点材料'],
+  ['量子密钥分发-QKD','量子安全芯片'],['后量子密码PQC','量子加密协议'],
+  ['量子操作系统','量子编译器'],['量子算法库','量子机器学习'],
+  ['量子化学计算','量子多体模拟'],['原子钟','光频标'],
+  ['量子中继器','量子网络'],['NV色心传感','二维材料'],
+  ['量子随机数QRNG','量子加密协议'],['量子编程语言','量子操作系统'],
+  ['量子优越性','量子纠错'],['量子重力仪','量子陀螺仪'],
+  ['冷原子干涉','原子钟'],['量子安全芯片','量子随机数QRNG'],
+  ['光量子计算','量子密钥分发-QKD'],['超导量子比特','微波量子技术'],
+  ['量子云平台','量子算法库'],['量子机器学习','量子优化'],
+  ['Majorana费米子','拓扑量子计算'],['石墨烯','量子点材料'],
+  ['量子成像','NV色心传感'],['时间频率传递','量子网络'],
+  ['PQC迁移服务','后量子密码PQC'],['量子身份认证','量子密钥分发-QKD'],
+];
+const ROOT={id:'量子科技',groupType:'root',clusterId:null};
+const clusterNodes=CLUSTERS.map(c=>({id:c.id,groupType:'cluster',clusterId:c.id,color:c.color,desc:c.desc}));
+const leafNodes=[];const nodeMap={};
+for(const[clusterId,leaves]of Object.entries(LEAF_NODES)){
+  const color=CLUSTERS.find(c=>c.id===clusterId).color;
+  for(const name of leaves){const n={id:name,groupType:'leaf',clusterId,color};leafNodes.push(n);nodeMap[name]=n;}}
+for(const cn of clusterNodes)nodeMap[cn.id]=cn;
+const nodes=[ROOT,...clusterNodes,...leafNodes];const nodeById={};nodes.forEach(n=>{nodeById[n.id]=n;});
+const links=[];
+for(const cn of clusterNodes)links.push({source:ROOT.id,target:cn.id,type:'tree-root'});
+for(const cn of clusterNodes){for(const leaf of leafNodes.filter(n=>n.clusterId===cn.id))links.push({source:cn.id,target:leaf.id,type:'tree-cluster'});}
+for(const[s,t]of CROSS_LINKS){if(nodeById[s]&&nodeById[t])links.push({source:s,target:t,type:'cross'});}
+const container=document.getElementById('graph');const width=window.innerWidth;const height=window.innerHeight;
+const svg=d3.select('#graph').append('svg').attr('width',width).attr('height',height);
+const defs=svg.append('defs');
+[['glow','4','8'],['strongGlow','8','12']].forEach(([id,sd,std])=>{
+  const f=defs.append('filter').attr('id',id).attr('x','-50%').attr('y','-50%').attr('width','200%').attr('height','200%');
+  f.append('feGaussianBlur').attr('stdDeviation',sd).attr('result','blur');
+  const m=f.append('feMerge');m.append('feMergeNode').attr('in','blur');m.append('feMergeNode').attr('in','SourceGraphic');
+});
+const crossGrad=defs.append('linearGradient').attr('id','crossGrad').attr('x1','0%').attr('y1','0%').attr('x2','100%').attr('y2','100%');
+crossGrad.append('stop').attr('offset','0%').attr('stop-color','#fff').attr('stop-opacity',0.06);
+crossGrad.append('stop').attr('offset','100%').attr('stop-color','#fff').attr('stop-opacity',0.01);
+CLUSTERS.forEach(c=>{const g=defs.append('radialGradient').attr('id',`grad-${c.id}`).attr('cx','30%').attr('cy','30%').attr('r','70%');g.append('stop').attr('offset','0%').attr('stop-color',c.color).attr('stop-opacity',0.9);g.append('stop').attr('offset','100%').attr('stop-color',c.color).attr('stop-opacity',0.3);});
+const rootGrad=defs.append('radialGradient').attr('id','grad-root').attr('cx','35%').attr('cy','35%').attr('r','65%');
+rootGrad.append('stop').attr('offset','0%').attr('stop-color','#60A5FA').attr('stop-opacity',1);
+rootGrad.append('stop').attr('offset','50%').attr('stop-color','#7C3AED').attr('stop-opacity',0.9);
+rootGrad.append('stop').attr('offset','100%').attr('stop-color','#4C1D95').attr('stop-opacity',0.5);
+const pat=defs.append('pattern').attr('id','bgPattern').attr('width',40).attr('height',40).attr('patternUnits','userSpaceOnUse');
+pat.append('circle').attr('cx',20).attr('cy',20).attr('r',0.6).attr('fill','rgba(255,255,255,0.04)');
+const g=svg.append('g');
+g.append('rect').attr('x',-width*2).attr('y',-height*2).attr('width',width*4).attr('height',height*4).attr('fill','url(#bgPattern)');
+const zoom=d3.zoom().scaleExtent([0.3,3]).on('zoom',(event)=>{g.attr('transform',event.transform);});
+svg.call(zoom);svg.call(zoom.transform,d3.zoomIdentity.translate(width/2,height/2));
+const linkGroup=g.append('g').attr('class','links');
+const linkElements=linkGroup.selectAll('line').data(links).join('line').attr('stroke',d=>{if(d.type==='tree-root')return'rgba(255,255,255,0.2)';if(d.type==='tree-cluster')return'rgba(255,255,255,0.06)';return'rgba(255,255,255,0.04)';}).attr('stroke-width',d=>{if(d.type==='tree-root')return2.5;if(d.type==='tree-cluster')return1.2;return0.8;}).attr('stroke-dasharray',d=>d.type==='cross'?'4,4':null).attr('opacity',d=>d.type==='cross'?0.35:0.6);
+const nodeGroup=g.append('g').attr('class','nodes');
+const rootNode=nodeGroup.append('g').datum(ROOT).attr('class','node-root');
+rootNode.append('circle').attr('r',46).attr('fill','url(#grad-root)').attr('filter','url(#strongGlow)').attr('stroke','rgba(96,165,250,0.4)').attr('stroke-width',2);
+rootNode.append('circle').attr('r',38).attr('fill','none').attr('stroke','rgba(255,255,255,0.08)').attr('stroke-width',1);
+rootNode.append('text').text('量子\n科技').attr('text-anchor','middle').attr('dy','-0.3em').attr('fill','#fff').attr('font-size','15px').attr('font-weight','700').attr('letter-spacing','2px').attr('style','text-shadow:0 0 20px rgba(96,165,250,0.5);');
+function wrapText(s,w){s.each(function(){const t=d3.select(this);const ws=t.text().split('\n');t.text(null);ws.forEach((w,i)=>{t.append('tspan').text(w).attr('x',0).attr('dy',i===0?'0em':'1.2em');});});}
+rootNode.select('text').call(wrapText,36);
+const clusterElements=nodeGroup.selectAll('.node-cluster').data(clusterNodes).join('g').attr('class','node-cluster').attr('cursor','pointer');
+clusterElements.each(function(d){const el=d3.select(this);el.append('circle').attr('r',22).attr('fill',`url(#grad-${d.id})`).attr('filter','url(#glow)').attr('stroke',d.color).attr('stroke-width',1.5).attr('stroke-opacity',0.5);el.append('text').text(d.id.length<=4?d.id:d.id.slice(0,4)+'…').attr('text-anchor','middle').attr('dy','0.35em').attr('fill','#fff').attr('font-size','13px').attr('font-weight','600').attr('letter-spacing','2px').attr('style','text-shadow:0 0 8px rgba(0,0,0,0.8);');});
+const leafElements=nodeGroup.selectAll('.node-leaf').data(leafNodes).join('g').attr('class','node-leaf');
+leafElements.each(function(d){const el=d3.select(this);el.append('circle').attr('r',7).attr('fill',d.color).attr('opacity',0.85).attr('stroke','rgba(255,255,255,0.15)').attr('stroke-width',1);el.append('circle').attr('r',3).attr('fill','#fff').attr('opacity',0.3).attr('cx',-2).attr('cy',-2);});
+leafElements.append('text').text(d=>d.id).attr('dx',12).attr('dy','0.35em').attr('fill','rgba(255,255,255,0.7)').attr('font-size','11px').attr('font-weight','400').attr('letter-spacing','1px').attr('style','text-shadow:0 0 8px rgba(0,0,0,0.9);pointer-events:none;');
+const RADIUS=Math.min(width,height)*0.28;const CLUSTER_R=Math.min(width,height)*0.13;
+const clusterAngles={};clusterNodes.forEach((c,i)=>{clusterAngles[c.id]=(i/clusterNodes.length)*2*Math.PI-Math.PI/2;});
+const simulation=d3.forceSimulation(nodes).force('center',d3.forceCenter(0,0).strength(0.01)).force('charge',d3.forceManyBody().strength(d=>{if(d.groupType==='root')return-800;if(d.groupType==='cluster')return-400;return-120;})).force('link',d3.forceLink(links).id(d=>d.id).distance(d=>{if(d.type==='tree-root')return RADIUS*0.9;if(d.type==='tree-cluster')return CLUSTER_R*1.0;return120;}).strength(d=>{if(d.type==='tree-root')return0.6;if(d.type==='tree-cluster')return0.8;return0.05;})).force('collide',d3.forceCollide().strength(0.5).radius(d=>{if(d.groupType==='root')return55;if(d.groupType==='cluster')return32;return20;}));
+simulation.force('clusterAngle',alpha=>{for(const c of clusterNodes){const a=clusterAngles[c.id];const tx=Math.cos(a)*RADIUS;const ty=Math.sin(a)*RADIUS;c.x+=(tx-c.x)*0.03*alpha;c.y+=(ty-c.y)*0.03*alpha;c.vx*=0.95;c.vy*=0.95;}});
+simulation.force('leafCluster',alpha=>{for(const n of leafNodes){const p=nodeById[n.clusterId];if(!p||!p.x||!p.y)continue;const dx=n.x-p.x;const dy=n.y-p.y;const dist=Math.sqrt(dx*dx+dy*dy);if(dist===0)continue;const td=CLUSTER_R*0.6+Math.random()*20;const pull=(dist-td)*0.02*alpha;n.x-=(dx/dist)*pull;n.y-=(dy/dist)*pull;}});
+simulation.force('fixRoot',alpha=>{ROOT.x=0;ROOT.y=0;ROOT.vx=0;ROOT.vy=0;});
+simulation.on('tick',()=>{linkElements.attr('x1',d=>d.source.x).attr('y1',d=>d.source.y).attr('x2',d=>d.target.x).attr('y2',d=>d.target.y);rootNode.attr('transform',d=>`translate(${d.x},${d.y})`);clusterElements.attr('transform',d=>`translate(${d.x},${d.y})`);leafElements.attr('transform',d=>`translate(${d.x},${d.y})`);});
+const tp=d3.select('#tooltip'),tpn=tp.select('.name'),tpg=tp.select('.group'),tpb=tp.select('.badge');
+function setupInt(sel,type){sel.on('mouseenter',function(event,d){d3.select(this).select('circle').transition().duration(200).attr('r',r=>{if(type==='root')return52;if(type==='cluster')return26;return10;});tpn.text(d.id);if(type==='root'){tpg.text('第二次量子革命的核心驱动力');tpb.text('● 量子科技').attr('class','badge root-badge');}else if(type==='cluster'){tpg.text(d.desc||'');tpb.text(d.id).attr('class','badge cluster-badge');}else{const p=CLUSTERS.find(c=>c.id===d.clusterId);tpg.text((p?p.id:'')+' · 前沿领域');tpb.text(d.clusterId).attr('class','badge cluster-badge');}tp.classed('visible',true).style('left',(event.clientX+20)+'px').style('top',(event.clientY-20)+'px');if(type!=='root'){linkElements.attr('stroke-opacity',l=>(l.source.id===d.id||l.target.id===d.id)?1:0.08).attr('stroke-width',l=>(l.source.id===d.id||l.target.id===d.id)?2.5:0.5);nodeGroup.selectAll('.node-cluster circle,.node-leaf circle').attr('opacity',n=>{if(n.id===d.id)return1;const connected=links.some(l=>(l.source.id===n.id&&l.target.id===d.id)||(l.target.id===n.id&&l.source.id===d.id));return connected?1:0.2;});}}).on('mousemove',function(event){tp.style('left',(event.clientX+20)+'px').style('top',(event.clientY-20)+'px');}).on('mouseleave',function(){d3.select(this).select('circle').transition().duration(300).attr('r',r=>{if(type==='root')return46;if(type==='cluster')return22;return7;});tp.classed('visible',false);linkElements.attr('stroke-opacity',d=>d.type==='cross'?0.35:0.6).attr('stroke-width',d=>{if(d.type==='tree-root')return2.5;if(d.type==='tree-cluster')return1.2;return0.8;});nodeGroup.selectAll('.node-cluster circle,.node-leaf circle').attr('opacity',d=>{if(d.groupType==='cluster')return1;return0.85;});});}
+setupInt(rootNode,'root');setupInt(clusterElements,'cluster');setupInt(leafElements,'leaf');
+const drag=d3.drag().subject(()=>simulation.find(d3.event.x,d3.event.y,30)).on('start',function(event,d){if(!event.active)simulation.alphaTarget(0.3).restart();d.fx=d.x;d.fy=d.y;}).on('drag',(event,d)=>{d.fx=event.x;d.fy=event.y;}).on('end',function(event,d){if(!event.active)simulation.alphaTarget(0);if(d.groupType!=='root')setTimeout(()=>{d.fx=null;d.fy=null;},2000);});
+g.selectAll('.node-cluster,.node-leaf,.node-root').call(drag);
+const lc=d3.select('#legend');CLUSTERS.forEach(c=>{const i=lc.append('div').attr('class','legend-item');i.append('div').attr('class','legend-dot').style('background',c.color);i.append('span').text(c.id);});
+document.getElementById('nodeCount').textContent=`集群 ${CLUSTERS.length} 个 · 细分领域 ${leafNodes.length} 项`;
+document.getElementById('linkCount').textContent=`产业关联 ${links.length} 条`;
+setTimeout(()=>{simulation.alphaTarget(0).stop();simulation.tick(10);const cx=d3.mean(nodes,d=>d.x)||0;const cy=d3.mean(nodes,d=>d.y)||0;svg.transition().duration(800).call(zoom.transform,d3.zoomIdentity.translate(width/2-cx,height/2-cy));},3000);
+function pulse(){rootNode.select('circle').transition().duration(2000).attr('r',48).transition().duration(2000).attr('r',44).on('end',pulse);}pulse();
+window.addEventListener('resize',()=>{const w=window.innerWidth,h=window.innerHeight;svg.attr('width',w).attr('height',h);});
+console.log('✅ 量子科技全景图已加载');
+</script>
+</body>
+</html>

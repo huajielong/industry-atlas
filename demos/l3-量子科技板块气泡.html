@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>量子科技 · 板块价值气泡图</title>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#070A15;font-family:'PingFang SC','Microsoft YaHei','Noto Sans SC',-apple-system,BlinkMacSystemFont,sans-serif;overflow:hidden;color:#fff;user-select:none}
+#app{width:100vw;height:100vh;position:relative}
+#header{position:absolute;top:18px;left:50%;transform:translateX(-50%);text-align:center;z-index:20;pointer-events:none}
+#header h1{font-size:26px;font-weight:700;letter-spacing:3px;background:linear-gradient(135deg,#60A5FA 0%,#A78BFA 40%,#60A5FA 100%);background-size:200% 200%;-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;animation:shimmer 4s ease-in-out infinite}
+@keyframes shimmer{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
+#header .subtitle{font-size:12px;color:rgba(255,255,255,0.35);letter-spacing:4px;margin-top:2px}
+#header .subtitle span{color:rgba(96,165,250,0.5)}
+#tooltip{position:absolute;z-index:100;background:rgba(7,10,21,0.94);backdrop-filter:blur(14px);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:16px 22px;pointer-events:none;opacity:0;transition:opacity 0.25s;box-shadow:0 12px 48px rgba(0,0,0,0.7);min-width:180px;max-width:280px}
+#tooltip.visible{opacity:1}
+#tooltip .name{font-size:16px;font-weight:600;color:#fff;letter-spacing:1px}
+#tooltip .layer{font-size:11px;letter-spacing:2px;margin-top:2px}
+#tooltip .scores{margin-top:10px}
+#tooltip .score-row{display:flex;justify-content:space-between;font-size:12px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.04)}
+#tooltip .score-row:last-child{border-bottom:none}
+#tooltip .score-row .label{color:rgba(255,255,255,0.45)}
+#tooltip .score-row .value{color:rgba(255,255,255,0.85);font-weight:500}
+#tooltip .score-row .bar-bg{width:60px;height:4px;background:rgba(255,255,255,0.08);border-radius:2px;margin-left:8px;display:inline-block;vertical-align:middle}
+#tooltip .score-row .bar-fill{height:100%;border-radius:2px}
+#legend{position:absolute;bottom:24px;left:50%;transform:translateX(-50%);display:flex;gap:28px;z-index:15;pointer-events:none}
+.legend-item{display:flex;align-items:center;gap:8px;font-size:12px;color:rgba(255,255,255,0.6);letter-spacing:1px}
+.legend-dot{width:12px;height:12px;border-radius:50%;border:1px solid rgba(255,255,255,0.1)}
+#stats{position:absolute;bottom:60px;right:24px;z-index:10;text-align:right;pointer-events:none;opacity:0.3}
+#stats div{font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;line-height:1.5}
+@media(max-width:768px){#header h1{font-size:18px;letter-spacing:1px}#header .subtitle{font-size:10px}#legend{gap:14px}.legend-item{font-size:10px}}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="header">
+    <h1>🔬 量子科技 · 板块战略价值气泡图</h1>
+    <div class="subtitle">WHICH SECTOR TO BET ON · <span>增长 × 盈利能力 × 壁垒</span></div>
+  </div>
+  <div id="graph"></div>
+  <div id="legend"></div>
+  <div id="stats"><div id="infoText"></div></div>
+  <div id="tooltip"><div class="name"></div><div class="layer"></div><div class="scores"></div></div>
+</div>
+<script>
+const DATA=[
+  {id:'超导量子处理器',layer:'硬件',color:'#60A5FA',growth:92,profit:45,moat:90,desc:'超导量子比特技术路线最成熟，IBM/Google领跑，工程化挑战大'},
+  {id:'离子阱处理器',layer:'硬件',color:'#60A5FA',growth:88,profit:40,moat:85,desc:'高保真度量子门操作，IonQ/Quantinuum商用，规模化是瓶颈'},
+  {id:'光量子计算',layer:'硬件',color:'#60A5FA',growth:85,profit:35,moat:75,desc:'光子路线室温运行，PsiQuantum/Xanadu推进中，集成度待突破'},
+  {id:'量子纠错技术',layer:'硬件',color:'#60A5FA',growth:90,profit:20,moat:92,desc:'逻辑量子比特实现最核心瓶颈，表面码实验验证加速'},
+  {id:'量子测控系统',layer:'硬件',color:'#60A5FA',growth:75,profit:55,moat:65,desc:'室温电子学系统，国产替代空间大，蓝海市场'},
+  {id:'量子芯片制造',layer:'硬件',color:'#60A5FA',growth:78,profit:50,moat:82,desc:'3D集成/倒装焊/超导工艺，专用fab需求'},
+  {id:'量子操作系统',layer:'软件',color:'#A78BFA',growth:82,profit:25,moat:55,desc:'量子编译栈与资源管理，开源生态初期'},
+  {id:'量子算法库',layer:'软件',color:'#A78BFA',growth:80,profit:20,moat:50,desc:'Shor/Grover/NISQ算法库，学术主导'},
+  {id:'量子云平台',layer:'软件',color:'#A78BFA',growth:88,profit:30,moat:60,desc:'量子算力即服务，AWS Braket/IBM Qiskit，商业探索期'},
+  {id:'量子机器学习',layer:'软件',color:'#A78BFA',growth:85,profit:25,moat:55,desc:'量子神经网络/VQE算法，学术热点但商业验证不足'},
+  {id:'量子金融',layer:'应用',color:'#34D399',growth:70,profit:65,moat:45,desc:'组合优化/风险分析/衍生品定价，试验性项目'},
+  {id:'量子制药与化学',layer:'应用',color:'#34D399',growth:82,profit:58,moat:70,desc:'分子模拟/电子结构计算，制药巨头布局中'},
+  {id:'量子通信网络',layer:'应用',color:'#34D399',growth:78,profit:60,moat:78,desc:'QKD网络部署/量子互联网，中国领先但商业化慢'},
+  {id:'量子加密安全',layer:'应用',color:'#34D399',growth:88,profit:70,moat:65,desc:'后量子密码迁移/QRNG加密，合规刚需驱动'},
+  {id:'量子导航定位',layer:'应用',color:'#34D399',growth:75,profit:45,moat:72,desc:'无GPS量子导航/量子陀螺仪，国防+特种应用'},
+  {id:'量子医学成像',layer:'应用',color:'#34D399',growth:65,profit:40,moat:68,desc:'NV色心生物成像/量子MRI，实验室阶段'},
+  {id:'量子传感',layer:'应用',color:'#34D399',growth:82,profit:55,moat:75,desc:'原子磁力计/量子重力仪，工业检测+地质勘探'},
+  {id:'量子材料与工艺',layer:'基础',color:'#F59E0B',growth:60,profit:30,moat:80,desc:'超导材料/拓扑绝缘体/2D材料，长期基础性投入'},
+  {id:'低温基础设施',layer:'基础',color:'#F59E0B',growth:55,profit:65,moat:72,desc:'稀释制冷机/极低温系统，国产替代空间大'},
+  {id:'单光子与光源',layer:'基础',color:'#F59E0B',growth:68,profit:40,moat:70,desc:'确定性单光子源/纠缠光子对，量子光学基础器件'},
+];
+const margin={top:80,right:60,bottom:70,left:70};const width=window.innerWidth;const height=window.innerHeight;
+const svg=d3.select('#graph').append('svg').attr('width',width).attr('height',height);
+const defs=svg.append('defs');
+const glow=defs.append('filter').attr('id','bubbleGlow').attr('x','-30%').attr('y','-30%').attr('width','160%').attr('height','160%');
+glow.append('feGaussianBlur').attr('stdDeviation','3').attr('result','blur');
+glow.append('feMerge').append('feMergeNode').attr('in','blur');
+glow.append('feMerge').append('feMergeNode').attr('in','SourceGraphic');
+const bgGrad=defs.append('linearGradient').attr('id','bgGrad').attr('x1','0%').attr('y1','0%').attr('x2','0%').attr('y2','100%');
+bgGrad.append('stop').attr('offset','0%').attr('stop-color','#0A0E20');
+bgGrad.append('stop').attr('offset','100%').attr('stop-color','#070A15');
+svg.append('rect').attr('width',width).attr('height',height).attr('fill','url(#bgGrad)');
+const pat=defs.append('pattern').attr('id','bgPat').attr('width',40).attr('height',40).attr('patternUnits','userSpaceOnUse');
+pat.append('circle').attr('cx',20).attr('cy',20).attr('r',0.5).attr('fill','rgba(255,255,255,0.03)');
+svg.append('rect').attr('width',width).attr('height',height).attr('fill','url(#bgPat)');
+const xScale=d3.scaleLinear().domain([5,100]).range([margin.left,width-margin.right]);
+const yScale=d3.scaleLinear().domain([5,100]).range([height-margin.bottom,margin.top]);
+const rScale=d3.scaleSqrt().domain([20,100]).range([10,38]);
+const SPLIT={x:52,y:52};
+[20,40,60,80].forEach(v=>{svg.append('line').attr('x1',xScale(v)).attr('x2',xScale(v)).attr('y1',yScale(5)).attr('y2',yScale(100)).attr('stroke','rgba(255,255,255,0.03)').attr('stroke-width',1);svg.append('line').attr('y1',yScale(v)).attr('y2',yScale(v)).attr('x1',xScale(5)).attr('x2',xScale(100)).attr('stroke','rgba(255,255,255,0.03)').attr('stroke-width',1);});
+const midX=xScale(SPLIT.x),midY=yScale(SPLIT.y);
+svg.append('line').attr('x1',midX).attr('x2',midX).attr('y1',yScale(5)).attr('y2',yScale(100)).attr('stroke','rgba(255,255,255,0.06)').attr('stroke-dasharray','6,4').attr('stroke-width',1);
+svg.append('line').attr('y1',midY).attr('y2',midY).attr('x1',xScale(5)).attr('x2',xScale(100)).attr('stroke','rgba(255,255,255,0.06)').attr('stroke-dasharray','6,4').attr('stroke-width',1);
+svg.append('text').text('盈利能力  →').attr('x',width/2).attr('y',height-12).attr('text-anchor','middle').attr('fill','rgba(255,255,255,0.3)').attr('font-size','13px').attr('letter-spacing','3px').attr('font-weight','300');
+svg.append('text').text('增长潜力  →').attr('y',height/2).attr('x',12).attr('text-anchor','middle').attr('fill','rgba(255,255,255,0.3)').attr('font-size','13px').attr('letter-spacing','3px').attr('font-weight','300').attr('transform',`rotate(-90,12,${height/2})`);
+[20,40,60,80].forEach(v=>{svg.append('text').text(`${v}`).attr('x',xScale(v)).attr('y',height-margin.bottom+20).attr('text-anchor','middle').attr('fill','rgba(255,255,255,0.2)').attr('font-size','10px');svg.append('text').text(`${v}`).attr('y',yScale(v)).attr('x',margin.left-16).attr('text-anchor','end').attr('dominant-baseline','middle').attr('fill','rgba(255,255,255,0.2)').attr('font-size','10px');});
+const quads=[{x:(52+100)/2,y:(100+52)/2,big:'🥇 黄金赛道',small:'高增长·高利润·投资首选',c:'rgba(255,215,0,0.5)',op:0.12},{x:(5+52)/2,y:(100+52)/2,big:'🔬 未来之星',small:'高增长·待变现·需耐心',c:'rgba(96,165,250,0.3)',op:0.08},{x:(52+100)/2,y:(52+5)/2,big:'🐄 现金牛',small:'稳定盈利·增长放缓·防守型',c:'rgba(52,211,153,0.3)',op:0.08},{x:(5+52)/2,y:(52+5)/2,big:'⚰️ 价值陷阱',small:'低增长·低利润·谨慎进入',c:'rgba(255,100,100,0.25)',op:0.06}];
+quads.forEach(q=>{const g=svg.append('g').attr('opacity',q.op);g.append('text').text(q.big).attr('x',xScale(q.x)).attr('y',yScale(q.y)-12).attr('text-anchor','middle').attr('fill',q.c).attr('font-size','28px').attr('font-weight','700').attr('letter-spacing','4px');g.append('text').text(q.small).attr('x',xScale(q.x)).attr('y',yScale(q.y)+12).attr('text-anchor','middle').attr('fill',q.c).attr('font-size','13px').attr('font-weight','300').attr('letter-spacing','2px');});
+const tooltip=d3.select('#tooltip'),tipName=tooltip.select('.name'),tipLayer=tooltip.select('.layer'),tipScores=tooltip.select('.scores');
+const bubbles=svg.append('g').attr('class','bubbles');
+const golden=DATA.filter(d=>d.growth>=60&&d.profit>=60);
+const bubbleEls=bubbles.selectAll('g').data(DATA).join('g').attr('cursor','pointer');
+bubbleEls.append('circle').attr('class','glow-ring').attr('r',d=>rScale(d.moat)+4).attr('fill',d=>d.color).attr('opacity',0.08).attr('filter','url(#bubbleGlow)');
+bubbleEls.append('circle').attr('class','bubble').attr('r',d=>rScale(d.moat)).attr('fill',d=>d.color).attr('opacity',d=>(d.growth>=60&&d.profit>=60)?0.8:0.65).attr('stroke',d=>(d.growth>=60&&d.profit>=60)?'#FFD700':d.color).attr('stroke-width',d=>(d.growth>=60&&d.profit>=60)?2.5:2).attr('stroke-opacity',d=>(d.growth>=60&&d.profit>=60)?0.5:0.4);
+bubbleEls.append('circle').attr('class','highlight').attr('r',d=>rScale(d.moat)*0.3).attr('fill','#fff').attr('opacity',0.2).attr('cx',d=>-rScale(d.moat)*0.25).attr('cy',d=>-rScale(d.moat)*0.25);
+bubbleEls.append('text').text(d=>d.id).attr('dx',0).attr('dy',d=>rScale(d.moat)+15).attr('text-anchor','middle').attr('fill','rgba(255,255,255,0.7)').attr('font-size','11px').attr('font-weight','500').attr('letter-spacing','1px').attr('style','text-shadow:0 0 10px rgba(0,0,0,0.95);pointer-events:none;');
+bubbleEls.attr('transform',d=>`translate(${xScale(d.profit)},${yScale(d.growth)})`);
+bubbleEls.on('mouseenter',function(event,d){const el=d3.select(this);el.select('.bubble').transition().duration(200).attr('opacity',1).attr('r',rScale(d.moat)*1.12);el.select('.glow-ring').transition().duration(200).attr('opacity',0.2).attr('r',rScale(d.moat)+8);el.raise();tipName.text(d.id);tipLayer.text(d.layer+' 板块').style('color',d.color);const bar=(v)=>{const w=Math.round(v/100*60);const c=v>=70?'#34D399':v>=45?'#F9CA24':'#FF6B6B';return`<span class="bar-bg"><span class="bar-fill" style="width:${w}px;background:${c}"></span></span>`;};tipScores.html([`<div class="score-row"><span class="label">📈 增长潜力</span><span class="value">${d.growth}/100 ${bar(d.growth)}</span></div>`,`<div class="score-row"><span class="label">💰 盈利能力</span><span class="value">${d.profit}/100 ${bar(d.profit)}</span></div>`,`<div class="score-row"><span class="label">🏰 竞争壁垒</span><span class="value">${d.moat}/100 ${bar(d.moat)}</span></div>`,`<div style="margin-top:6px;font-size:11px;color:rgba(255,255,255,0.35);border-top:1px solid rgba(255,255,255,0.06);padding-top:6px">${d.desc}</div>`].join(''));tooltip.classed('visible',true).style('left',Math.min(event.clientX+20,width-300)+'px').style('top',Math.max(event.clientY-150,10)+'px');bubbleEls.filter(function(){return this!==el.node();}).select('.bubble').transition().duration(200).attr('opacity',0.2);bubbleEls.filter(function(){return this!==el.node();}).select('text').transition().duration(200).attr('opacity',0.2);}).on('mousemove',function(event){tooltip.style('left',Math.min(event.clientX+20,width-300)+'px').style('top',Math.max(event.clientY-150,10)+'px');}).on('mouseleave',function(){tooltip.classed('visible',false);bubbleEls.select('.bubble').transition().duration(300).attr('opacity',d=>(d.growth>=60&&d.profit>=60)?0.8:0.65).attr('r',d=>rScale(d.moat));bubbleEls.select('.glow-ring').transition().duration(300).attr('opacity',0.08).attr('r',d=>rScale(d.moat)+4);bubbleEls.select('text').transition().duration(300).attr('opacity',1);});
+const legend=d3.select('#legend');
+[['硬件·量子处理器','#60A5FA'],['软件·算法平台','#A78BFA'],['应用·行业方案','#34D399'],['基础·材料与设备','#F59E0B']].forEach(([l,c])=>{legend.append('div').attr('class','legend-item').html(`<div class="legend-dot" style="background:${c}"></div><span>${l}</span>`);});
+document.getElementById('infoText').textContent=`${DATA.length} 个细分板块 · 气泡越大=壁垒越高 · 金色描边=黄金赛道 · 悬停看评分`;
+window.addEventListener('resize',()=>location.reload());
+console.log('✅ 量子科技板块气泡图已加载');
+console.log('🥇 黄金赛道:',golden.map(d=>d.id).join(', '));
+</script>
+</body>
+</html>

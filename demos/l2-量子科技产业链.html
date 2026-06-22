@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>量子科技 · 产业链全景图谱</title>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#070A15;font-family:'PingFang SC','Microsoft YaHei','Noto Sans SC',-apple-system,BlinkMacSystemFont,sans-serif;overflow:hidden;color:#fff;user-select:none}
+#app{width:100vw;height:100vh;position:relative}
+#header{position:absolute;top:22px;left:50%;transform:translateX(-50%);text-align:center;z-index:20;pointer-events:none}
+#header h1{font-size:28px;font-weight:700;letter-spacing:4px;background:linear-gradient(135deg,#60A5FA 0%,#A78BFA 40%,#60A5FA 100%);background-size:200% 200%;-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;animation:shimmer 4s ease-in-out infinite}
+@keyframes shimmer{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
+#header .subtitle{font-size:13px;color:rgba(255,255,255,0.4);letter-spacing:6px;margin-top:4px;font-weight:300}
+#header .subtitle span{color:rgba(96,165,250,0.5)}
+#tooltip{position:absolute;z-index:100;background:rgba(7,10,21,0.92);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:14px 20px;pointer-events:none;opacity:0;transition:opacity 0.2s;box-shadow:0 8px 40px rgba(0,0,0,0.6);min-width:140px;text-align:center}
+#tooltip.visible{opacity:1}
+#tooltip .name{font-size:16px;font-weight:600;color:#fff}
+#tooltip .group{font-size:12px;color:rgba(255,255,255,0.4);margin-top:4px;letter-spacing:2px}
+#tooltip .badge{display:inline-block;padding:2px 14px;border-radius:20px;font-size:11px;margin-top:6px;letter-spacing:2px}
+#tooltip .badge.upstream{background:rgba(96,165,250,0.15);color:#60A5FA;border:1px solid rgba(96,165,250,0.3)}
+#tooltip .badge.midstream{background:rgba(167,139,250,0.15);color:#A78BFA;border:1px solid rgba(167,139,250,0.3)}
+#tooltip .badge.downstream{background:rgba(52,211,153,0.15);color:#34D399;border:1px solid rgba(52,211,153,0.3)}
+#stats{position:absolute;bottom:30px;right:28px;z-index:10;text-align:right;pointer-events:none;opacity:0.35}
+#stats div{font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;line-height:1.6}
+@media(max-width:768px){#header h1{font-size:20px;letter-spacing:2px}#header .subtitle{font-size:10px;letter-spacing:3px}#stats{display:none}}
+@media(max-width:480px){#header h1{font-size:16px;letter-spacing:1px}#header{top:14px}}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="header">
+    <h1>🔬 量子科技 · 产业链全景图谱</h1>
+    <div class="subtitle">QUANTUM TECHNOLOGY INDUSTRY CHAIN · <span>从基础研究到产业化应用</span></div>
+  </div>
+  <div id="graph"></div>
+  <div id="stats"><div id="nodeCount"></div><div id="linkCount"></div></div>
+  <div id="tooltip"><div class="name"></div><div class="group"></div><div class="badge"></div></div>
+</div>
+<script>
+const LAYERS=[
+  {id:'上游',label:'基础研究层',labelEn:'FOUNDATION',color:'#60A5FA',desc:'量子基础理论与核心材料',yRatio:0.17,nodes:[
+    {id:'超导材料',desc:'Nb/Al/AlOx约瑟夫森结，超导量子比特材料基础'},
+    {id:'半导体量子点',desc:'Si/SiGe量子点阵列，兼容CMOS工艺'},
+    {id:'二维材料',desc:'石墨烯/二硫化钼等二维量子材料'},
+    {id:'拓扑绝缘体',desc:'Majorana费米子候选材料体系'},
+    {id:'光学晶格',desc:'冷原子囚禁与光晶格量子模拟平台'},
+    {id:'量子纠错码',desc:'表面码/颜色码/量子纠错理论'},
+    {id:'量子算法理论',desc:'Shor算法/Grover算法/量子机器学习理论'},
+    {id:'单光子源',desc:'确定性单光子发射器/量子光源'},
+    {id:'低温系统',desc:'稀释制冷机/极低温量子比特运行环境'},
+  ]},
+  {id:'中游',label:'核心技术层',labelEn:'TECHNOLOGY',color:'#A78BFA',desc:'量子处理器与系统平台',yRatio:0.50,nodes:[
+    {id:'超导量子处理器',desc:'超导量子芯片设计与制造'},
+    {id:'离子阱量子处理器',desc:'囚禁离子量子比特操控与读取'},
+    {id:'光量子计算平台',desc:'光子量子计算与量子模拟'},
+    {id:'量子操作系统',desc:'量子指令集/编译栈/资源管理'},
+    {id:'量子测控系统',desc:'室温电子学/微波测控/量子态读取'},
+    {id:'量子芯片封装',desc:'3D集成/倒装焊/量子芯片互联'},
+    {id:'量子纠错实现',desc:'表面码/重复码/逻辑量子比特'},
+    {id:'量子随机数芯片',desc:'QRNG芯片/量子熵源采集'},
+    {id:'量子中继器',desc:'长距离量子纠缠分发中继设备'},
+    {id:'量子传感器制造',desc:'NV色心/MEMS量子传感器制造'},
+  ]},
+  {id:'下游',label:'应用服务层',labelEn:'APPLICATION',color:'#34D399',desc:'量子赋能行业解决方案',yRatio:0.83,nodes:[
+    {id:'量子计算云平台',desc:'量子计算云端接入/量子算力即服务'},
+    {id:'量子金融',desc:'量子优化/风险管理/衍生品定价'},
+    {id:'量子制药',desc:'分子模拟/药物研发/量子化学'},
+    {id:'量子通信网络',desc:'量子密钥分发网络/量子互联网'},
+    {id:'量子加密安全',desc:'量子加密VPN/后量子密码迁移'},
+    {id:'量子导航定位',desc:'量子陀螺/无GPS量子导航'},
+    {id:'量子医学成像',desc:'NV色心生物成像/量子MRI'},
+    {id:'量子时间同步',desc:'原子钟网络/高精度时间同步'},
+    {id:'量子AI',desc:'量子机器学习/量子神经网络'},
+    {id:'量子优化',desc:'组合优化/交通调度/物流规划'},
+  ]},
+];
+const CROSS_LINKS=[
+  ['超导材料','超导量子处理器'],['半导体量子点','超导量子处理器'],['二维材料','量子传感器制造'],
+  ['拓扑绝缘体','量子纠错实现'],['光学晶格','量子中继器'],['量子纠错码','量子纠错实现'],
+  ['量子算法理论','量子操作系统'],['单光子源','光量子计算平台'],['低温系统','超导量子处理器'],
+  ['超导量子处理器','量子计算云平台'],['离子阱量子处理器','量子计算云平台'],
+  ['光量子计算平台','量子制药'],['量子操作系统','量子AI'],['量子测控系统','量子传感器制造'],
+  ['量子随机数芯片','量子加密安全'],['随机数芯片','量子加密安全'],
+  ['量子芯片封装','超导量子处理器'],['量子传感器制造','量子导航定位'],
+  ['量子传感器制造','量子医学成像'],['量子中继器','量子通信网络'],
+  ['量子纠错实现','量子计算云平台'],['量子随机数芯片','量子通信网络'],
+  ['低温系统','量子芯片封装'],['单光子源','量子中继器'],
+  ['超导材料','量子芯片封装'],['半导体量子点','量子测控系统'],
+  ['量子算法理论','量子优化'],['量子算法理论','量子金融'],
+  ['光学晶格','量子时间同步'],['拓扑绝缘体','量子加密安全'],
+  ['二维材料','量子医学成像'],['量子操作系统','量子AI'],
+];
+const allNodes=[];const nodeById={};const allLinks=[];
+LAYERS.forEach((layer,li)=>{
+  layer.nodes.forEach((n,ni)=>{
+    const node={id:n.id,desc:n.desc,layerId:layer.id,layerIndex:li,layerLabel:layer.label,layerEn:layer.labelEn,layerColor:layer.color,nodeIndex:ni,totalInLayer:layer.nodes.length};
+    allNodes.push(node);nodeById[n.id]=node;
+  });
+});
+for(const[s,t]of CROSS_LINKS){if(nodeById[s]&&nodeById[t])allLinks.push({source:s,target:t,type:'cross'});}
+LAYERS.forEach(layer=>{for(let i=0;i<layer.nodes.length-1;i++)allLinks.push({source:layer.nodes[i].id,target:layer.nodes[i+1].id,type:'intra'});});
+const container=document.getElementById('graph');const width=window.innerWidth;const height=window.innerHeight;
+const svg=d3.select('#graph').append('svg').attr('width',width).attr('height',height);
+const defs=svg.append('defs');
+[['glow','5'],['sglow','10']].forEach(([id,sd])=>{
+  const f=defs.append('filter').attr('id',id).attr('x','-50%').attr('y','-50%').attr('width','200%').attr('height','200%');
+  f.append('feGaussianBlur').attr('stdDeviation',sd).attr('result','blur');
+  f.append('feMerge').append('feMergeNode').attr('in','blur');
+  f.append('feMerge').append('feMergeNode').attr('in','SourceGraphic');
+});
+const pat=defs.append('pattern').attr('id','bgP').attr('width',60).attr('height',60).attr('patternUnits','userSpaceOnUse');
+pat.append('circle').attr('cx',30).attr('cy',30).attr('r',0.8).attr('fill','rgba(255,255,255,0.03)');
+LAYERS.forEach((layer,i)=>{
+  const g=defs.append('linearGradient').attr('id',`layerBg${i}`).attr('x1','0%').attr('y1','0%').attr('x2','0%').attr('y2','100%');
+  g.append('stop').attr('offset','0%').attr('stop-color',layer.color).attr('stop-opacity',0.04);
+  g.append('stop').attr('offset','100%').attr('stop-color',layer.color).attr('stop-opacity',0.01);
+});
+const G=svg.append('g');
+G.append('rect').attr('x',-width).attr('y',-height).attr('width',width*3).attr('height',height*3).attr('fill','url(#bgP)');
+const zoom=d3.zoom().scaleExtent([0.4,2.5]).on('zoom',(event)=>{G.attr('transform',event.transform);});
+svg.call(zoom);svg.call(zoom.transform,d3.zoomIdentity.translate(width/2,height/2));
+const LAYER_Y={};LAYERS.forEach((layer,i)=>{LAYER_Y[layer.id]=(layer.yRatio-0.5)*height*0.85;});
+LAYERS.forEach((layer,i)=>{
+  G.append('rect').attr('x',-width*0.7).attr('y',LAYER_Y[layer.id]-75).attr('width',width*1.4).attr('height',150).attr('fill',`url(#layerBg${i})`).attr('rx',8).attr('opacity',0.6);
+  G.append('text').text(`${layer.id} · ${layer.label}`).attr('x',-width*0.44).attr('y',LAYER_Y[layer.id]+5).attr('text-anchor','middle').attr('fill',layer.color).attr('font-size','12px').attr('font-weight','600').attr('letter-spacing','4px').attr('opacity',0.5);
+  if(i>0){G.append('line').attr('x1',-width*0.45).attr('x2',width*0.45).attr('y1',LAYER_Y[layer.id]-85).attr('y2',LAYER_Y[layer.id]-85).attr('stroke','rgba(255,255,255,0.04)').attr('stroke-width',1).attr('stroke-dasharray','6,4');}
+});
+for(let i=0;i<LAYERS.length-1;i++){
+  const y1=LAYER_Y[LAYERS[i].id]+82;const y2=LAYER_Y[LAYERS[i+1].id]-82;
+  G.append('line').attr('x1',0).attr('x2',0).attr('y1',y1).attr('y2',y2).attr('stroke','rgba(255,255,255,0.06)').attr('stroke-width',1).attr('stroke-dasharray','3,5');
+  G.append('polygon').attr('points','-4,-4 4,-4 0,4').attr('fill','rgba(255,255,255,0.08)').attr('transform',`translate(0,${y2})`);
+}
+const linkGroup=G.append('g').attr('class','links');
+const linkElements=linkGroup.selectAll('line').data(allLinks).join('line').attr('stroke',l=>{if(l.type==='cross'){const src=nodeById[l.source.id||l.source];const tgt=nodeById[l.target.id||l.target];if(src&&tgt){return d3.interpolateRgb(d3.color(src.layerColor),d3.color(tgt.layerColor))(0.5);}return'rgba(255,255,255,0.15)';}return'rgba(255,255,255,0.04)';}).attr('stroke-width',l=>l.type==='cross'?1.2:0.5).attr('stroke-dasharray',l=>l.type==='cross'?'5,4':'2,3').attr('opacity',l=>l.type==='cross'?0.35:0.15);
+const nodeGroup=G.append('g').attr('class','nodes');
+const layerGroups={};LAYERS.forEach(layer=>{layerGroups[layer.id]=nodeGroup.append('g').attr('class',`layer-${layer.id}`);});
+const allNodeElements=[];
+allNodes.forEach(d=>{const layer=LAYERS[d.layerIndex];const el=layerGroups[layer.id].append('g').datum(d).attr('class',`node-${d.layerId}`).attr('cursor','pointer');
+el.append('circle').attr('r',9).attr('fill',d.layerColor).attr('opacity',0.9).attr('stroke','rgba(255,255,255,0.15)').attr('stroke-width',1.2).attr('filter','url(#glow)');
+el.append('circle').attr('r',4).attr('fill','#fff').attr('opacity',0.25).attr('cx',-3).attr('cy',-3);
+el.append('text').text(d.id).attr('dx',15).attr('dy','0.35em').attr('fill','rgba(255,255,255,0.8)').attr('font-size','12px').attr('font-weight','500').attr('letter-spacing','1px').attr('style','text-shadow:0 0 12px rgba(0,0,0,0.95);pointer-events:none;');
+allNodeElements.push(el);});
+const simulation=d3.forceSimulation(allNodes).force('charge',d3.forceManyBody().strength(-250)).force('collide',d3.forceCollide(22)).force('link',d3.forceLink(allLinks).id(d=>d.id).distance(l=>{if(l.type==='cross')return160;return50;}).strength(l=>{if(l.type==='cross')return0.04;return0.01;}));
+simulation.force('layerY',alpha=>{allNodes.forEach(d=>{const targetY=LAYER_Y[d.layerId];d.y+=(targetY-d.y)*0.08*alpha;d.vy*=0.9;});});
+simulation.force('xSpread',alpha=>{LAYERS.forEach(layer=>{const nodes=allNodes.filter(d=>d.layerId===layer.id);if(nodes.length<2)return;const spacing=Math.min(width*0.55/nodes.length,80);const totalW=spacing*(nodes.length-1);nodes.sort((a,b)=>a.nodeIndex-b.nodeIndex);nodes.forEach((d,i)=>{const tx=-totalW/2+i*spacing;d.x+=(tx-d.x)*0.05*alpha;});});});
+simulation.on('tick',()=>{linkElements.attr('x1',d=>d.source.x).attr('y1',d=>d.source.y).attr('x2',d=>d.target.x).attr('y2',d=>d.target.y);allNodeElements.forEach(el=>{const d=el.datum();el.attr('transform',`translate(${d.x},${d.y})`);});});
+const tp=d3.select('#tooltip'),tpn=tp.select('.name'),tpg=tp.select('.group'),tpb=tp.select('.badge');
+function setupNodeInt(sel){sel.on('mouseenter',function(event,d){d3.select(this).select('circle').transition().duration(200).attr('r',13).attr('stroke-width',2);tpn.text(d.id);tpg.text(d.desc||'');const bc=d.layerId==='上游'?'upstream':d.layerId==='中游'?'midstream':'downstream';const bt=d.layerId+' · '+d.layerLabel;tpb.text(bt).attr('class',`badge ${bc}`);tp.classed('visible',true).style('left',(event.clientX+20)+'px').style('top',(event.clientY-25)+'px');linkElements.attr('opacity',l=>{const sid=l.source.id||l.source;const tid=l.target.id||l.target;return(sid===d.id||tid===d.id)?0.8:0.06;}).attr('stroke-width',l=>{const sid=l.source.id||l.source;const tid=l.target.id||l.target;return(sid===d.id||tid===d.id)?2.5:0.5;});allNodeElements.each(function(n){if(n.id===d.id)return;const connected=allLinks.some(l=>{const sid=l.source.id||l.source;const tid=l.target.id||l.target;return(sid===n.id&&tid===d.id)||(tid===n.id&&sid===d.id);});d3.select(this).select('circle').attr('opacity',connected?1:0.15);d3.select(this).select('text').attr('opacity',connected?1:0.15);});}).on('mousemove',function(event){tp.style('left',(event.clientX+20)+'px').style('top',(event.clientY-25)+'px');}).on('mouseleave',function(){d3.select(this).select('circle').transition().duration(300).attr('r',9).attr('stroke-width',1.2);tp.classed('visible',false);linkElements.attr('opacity',l=>l.type==='cross'?0.35:0.15).attr('stroke-width',l=>l.type==='cross'?1.2:0.5);allNodeElements.each(function(n){d3.select(this).select('circle').attr('opacity',0.9);d3.select(this).select('text').attr('opacity',1);});});}
+const drag=d3.drag().subject(()=>simulation.find(d3.event.x,d3.event.y,30)).on('start',function(event,d){if(!event.active)simulation.alphaTarget(0.3).restart();d.fx=d.x;d.fy=d.y;}).on('drag',(event,d)=>{d.fx=event.x;d.fy=event.y;}).on('end',function(event,d){if(!event.active)simulation.alphaTarget(0);setTimeout(()=>{d.fx=null;d.fy=null;},2000);});
+allNodeElements.forEach(el=>{setupNodeInt(el);el.call(drag);});
+document.getElementById('nodeCount').textContent=`上游·基础研究层 ${LAYERS[0].nodes.length} · 中游·核心技术层 ${LAYERS[1].nodes.length} · 下游·应用服务层 ${LAYERS[2].nodes.length} | 合计 ${allNodes.length} 个节点`;
+document.getElementById('linkCount').textContent=`产业链关联 ${allLinks.filter(l=>l.type==='cross').length} 条`;
+setTimeout(()=>{simulation.alphaTarget(0).stop();simulation.tick(20);svg.transition().duration(600).call(zoom.transform,d3.zoomIdentity.translate(width/2,height/2));},3500);
+window.addEventListener('resize',()=>{svg.attr('width',window.innerWidth).attr('height',window.innerHeight);});
+console.log('✅ 量子科技产业链图谱已加载');
+</script>
+</body>
+</html>

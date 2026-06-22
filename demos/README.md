@@ -49,6 +49,21 @@ Vertical layered chain: upstream (infrastructure, 11 nodes) → midstream (techn
 
 ---
 
+## 🧪 Bonus: 量子科技 (Quantum Technology) — All 4 Modes
+
+| File | Mode | Content |
+|:-----|:-----|:--------|
+| `l1-量子科技产业全景.html` | 🗺️ L1 Panorama | 8 clusters (量子计算/通信/传感/测量/模拟/软件/安全/材料), 48+ sub-items |
+| `l2-量子科技产业链.html` | 🔗 L2 Chain | 上·基础研究层(9) → 中·核心技术层(10) → 下·应用服务层(10) |
+| `l3-量子科技板块气泡.html` | 💎 L3 Sector Bubble | 20 sectors in 4 groups (硬件/软件/应用/基础), growth×profitability×moat |
+| `l4-量子科技公司气泡.html` | 🏢 L4 Company Bubble | 18 companies (IBM/Google/IonQ/Quantinuum/国盾/本源/国仪等), brand colors |
+
+**Title gradient:** Blue-purple (#60A5FA → #A78BFA) — quantum/future-tech theme.
+
+## Mode Coverage
+
+---
+
 ## Mode Coverage
 
 | File | Mode | Nodes | Industry Theme |
