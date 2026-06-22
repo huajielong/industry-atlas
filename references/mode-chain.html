@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>产业链全景图谱</title>
+<script src="https://d3js.org/d3.v7.min.js">
+</script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #070A15;
+  font-family: 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif;
+  overflow: hidden; color: #fff; user-select: none;
+}
+#app { width: 100vw; height: 100vh; position: relative; }
+#header {
+  position: absolute; top: 22px; left: 50%; transform: translateX(-50%);
+  text-align: center; z-index: 20; pointer-events: none;
+}
+#header h1 {
+  font-size: 28px; font-weight: 700; letter-spacing: 4px;
+  background: linear-gradient(135deg, #60A5FA 0%, #A78BFA 40%, #60A5FA 100%);
+  background-size: 200% 200%;
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  animation: shimmer 4s ease-in-out infinite;
+}
+@keyframes shimmer {
+  0%,100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+#header .subtitle { font-size: 13px; color: rgba(255,255,255,0.4); letter-spacing: 6px; margin-top: 4px; font-weight: 300; }
+#header .subtitle span { color: rgba(96,165,250,0.6); }
+#tooltip {
+  position: absolute; z-index: 100;
+  background: rgba(7,10,21,0.92); backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.1); border-radius: 10px;
+  padding: 14px 20px; pointer-events: none; opacity: 0;
+  transition: opacity 0.2s; box-shadow: 0 8px 40px rgba(0,0,0,0.6);
+  min-width: 140px; text-align: center;
+}
+#tooltip.visible { opacity: 1; }
+#tooltip .name { font-size: 16px; font-weight: 600; color: #fff; }
+#tooltip .group { font-size: 12px; color: rgba(255,255,255,0.4); margin-top: 4px; letter-spacing: 2px; }
+#tooltip .badge { display: inline-block; padding: 2px 14px; border-radius: 20px; font-size: 11px; margin-top: 6px; letter-spacing: 2px; }
+#stats {
+  position: absolute; bottom: 30px; right: 28px; z-index: 10;
+  text-align: right; pointer-events: none; opacity: 0.35;
+}
+#stats div { font-size: 11px; color: rgba(255,255,255,0.4); letter-spacing: 1px; line-height: 1.6; }
+@media (max-width: 768px) {
+  #header h1 { font-size: 20px; letter-spacing: 2px; }
+  #header .subtitle { font-size: 10px; letter-spacing: 3px; }
+  #stats { display: none; }
+}
+@media (max-width: 480px) {
+  #header h1 { font-size: 16px; letter-spacing: 1px; }
+  #header { top: 14px; }
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="header">
+    <h1 id="pageTitle">产业链全景图谱</h1>
+    <div class="subtitle" id="pageSubtitle">INDUSTRY CHAIN · <span>从上游到下游</span></div>
+  </div>
+  <div id="graph"></div>
+  <div id="stats"><div id="nodeCount"></div><div id="linkCount"></div></div>
+  <div id="tooltip"><div class="name"></div><div class="group"></div><div class="badge"></div></div>
+</div>
+
+<script>
+// ====================================================================
+//  ✏️ 在此编辑数据 — 产业链图谱（纵向分层布局）
+//  数据格式说明：
+//    LAYERS: 层级数组 [{ id, label, labelEn, color, desc, yRatio, nodes }]
+//      yRatio: 层级在垂直方向的位置 (0=顶 1=底)，推荐2层0.28/0.72，3层0.22/0.50/0.78
+//      nodes: [{ id, desc }]
+//    CROSS_LINKS: 跨层关联 [源id, 目标id]
+//      方向规则：上游→中游，中游→下游，少量上游→下游
+// ====================================================================
+
+const LAYERS = [
+  {
+    id: '上游', label: '基础层', labelEn: 'INFRASTRUCTURE',
+    color: '#60A5FA', desc: '算力·数据·网络 — AI的硬件与数据基础',
+    yRatio: 0.22,
+    nodes: [
+      { id: 'AI训练芯片',   desc: 'GPU/NPU/TPU等大模型训练专用芯片' },
+      { id: 'AI推理芯片',   desc: '边缘端/终端低功耗推理芯片' },
+      { id: '智算中心',     desc: '大规模AI算力集群基础设施' },
+      { id: '云计算平台',   desc: 'AWS/Azure/阿里云等云服务' },
+      { id: '数据采集',     desc: '多模态数据获取与清洗' },
+      { id: '数据标注',     desc: '人工+AI辅助数据标注服务' },
+      { id: '数据交易',     desc: '数据要素市场化流通平台' },
+      { id: '5G/6G通信',   desc: '高带宽低延迟通信网络' },
+      { id: '光模块',       desc: '高速光互联关键器件' },
+      { id: '半导体设备',   desc: '芯片制造关键装备' },
+      { id: '先进封装',     desc: 'Chiplet/3D封装等先进封装技术' },
+    ],
+  },
+  {
+    id: '中游', label: '技术层', labelEn: 'TECHNOLOGY',
+    color: '#A78BFA', desc: '模型·算法·框架 — AI核心技术栈',
+    yRatio: 0.50,
+    nodes: [
+      { id: '大语言模型',   desc: 'GPT/Claude/文心/通义等基础大模型' },
+      { id: '多模态模型',   desc: '文本+图像+视频+音频统一建模' },
+      { id: '计算机视觉',   desc: '图像识别/目标检测/视频理解' },
+      { id: '自然语言处理', desc: '语音识别/机器翻译/情感分析' },
+      { id: '机器学习框架', desc: 'PyTorch/TensorFlow/PaddlePaddle' },
+      { id: 'AI智能体',     desc: '自主决策与执行的AI Agent' },
+      { id: '模型压缩',     desc: '量化/蒸馏/剪枝等轻量化技术' },
+      { id: '提示工程',     desc: 'Prompt设计/优化/管理' },
+      { id: 'AI安全对齐',   desc: '价值观对齐/安全护栏/红队测试' },
+      { id: '开源模型生态', desc: 'Llama/Mistral/千问等开源社区' },
+      { id: '向量数据库',   desc: 'RAG架构核心基础设施' },
+    ],
+  },
+  {
+    id: '下游', label: '应用层', labelEn: 'APPLICATION',
+    color: '#34D399', desc: '场景·产品·服务 — AI赋能千行百业',
+    yRatio: 0.78,
+    nodes: [
+      { id: 'AI+医疗',     desc: 'AI制药/医学影像/辅助诊断' },
+      { id: 'AI+金融',     desc: '智能风控/量化交易/智能投顾' },
+      { id: 'AI+制造',     desc: '工业质检/预测性维护/数字孪生' },
+      { id: 'AI+自动驾驶', desc: 'L4/L5无人驾驶/车路协同' },
+      { id: 'AI+内容创作', desc: 'AIGC/视频生成/数字人/音乐创作' },
+      { id: 'AI+教育',     desc: '个性化学习/智能辅导/自适应评测' },
+      { id: 'AI+机器人',   desc: '具身智能/人形机器人/协作机器人' },
+      { id: 'AI+科学',     desc: 'AlphaFold/AI for Science/材料发现' },
+      { id: 'AI+编程',     desc: 'Copilot/Cursor/Devin等AI编程助手' },
+      { id: 'AI+安全',     desc: 'AI驱动的威胁检测/漏洞挖掘' },
+      { id: 'AI+营销',     desc: '智能推荐/广告投放优化/用户画像' },
+    ],
+  },
+];
+
+// 跨层关联 [源id, 目标id] — 必须遵守方向：上游→中游→下游
+const CROSS_LINKS = [
+  // 上游→中游
+  ['AI训练芯片',   '大语言模型'],   ['AI推理芯片', '计算机视觉'],
+  ['AI训练芯片',   '多模态模型'],   ['智算中心',   '大语言模型'],
+  ['云计算平台',   '机器学习框架'], ['数据采集',   '大语言模型'],
+  ['数据标注',     '计算机视觉'],   ['数据交易',   '自然语言处理'],
+  ['5G/6G通信',   'AI智能体'],     ['先进封装',   'AI训练芯片'],
+  ['半导体设备',   'AI推理芯片'],
+  // 中游→下游
+  ['大语言模型',   'AI+编程'],     ['大语言模型',  'AI+营销'],
+  ['大语言模型',   'AI+教育'],     ['多模态模型',  'AI+内容创作'],
+  ['计算机视觉',   'AI+自动驾驶'], ['计算机视觉',  'AI+制造'],
+  ['自然语言处理', 'AI+医疗'],     ['AI智能体',    'AI+机器人'],
+  ['AI智能体',     'AI+金融'],     ['机器学习框架','AI+科学'],
+  ['模型压缩',     'AI+机器人'],   ['AI安全对齐',  'AI+安全'],
+  ['向量数据库',   'AI+营销'],     ['开源模型生态','AI+编程'],
+  ['提示工程',     'AI+教育'],
+  // 上游→下游（少量直接赋能）
+  ['云计算平台',   'AI+内容创作'], ['5G/6G通信',   'AI+自动驾驶'],
+  ['AI推理芯片',   'AI+机器人'],   ['智算中心',    'AI+科学'],
+];
+
+// ---- 页面标题（可自定义）----
+const PAGE_CONFIG = {
+  title: 'AI产业链全景图谱',
+  subtitle: 'ARTIFICIAL INTELLIGENCE INDUSTRY CHAIN · ',
+  subtitleHighlight: '从基础层到应用层',
+};
+
+// ====================================================================
+//  以下代码无需修改 — 通用的纵向分层布局渲染引擎
+// ====================================================================
+
+document.getElementById('pageTitle').textContent = PAGE_CONFIG.title;
+document.getElementById('pageSubtitle').innerHTML = PAGE_CONFIG.subtitle + '<span>' + PAGE_CONFIG.subtitleHighlight + '</span>';
+
+// Build graph data
+const allNodes = []; const nodeById = {}; const allLinks = [];
+LAYERS.forEach((layer, li) => {
+  layer.nodes.forEach((n, ni) => {
+    const node = {
+      id: n.id, desc: n.desc,
+      layerId: layer.id, layerIndex: li,
+      layerLabel: layer.label, layerEn: layer.labelEn,
+      layerColor: layer.color,
+      nodeIndex: ni, totalInLayer: layer.nodes.length,
+    };
+    allNodes.push(node); nodeById[n.id] = node;
+  });
+});
+for (const [s, t] of CROSS_LINKS) {
+  if (nodeById[s] && nodeById[t]) allLinks.push({ source: s, target: t, type: 'cross' });
+}
+LAYERS.forEach(layer => {
+  for (let i = 0; i < layer.nodes.length - 1; i++) {
+    allLinks.push({ source: layer.nodes[i].id, target: layer.nodes[i+1].id, type: 'intra' });
+  }
+});
+
+// Setup SVG
+const W = window.innerWidth, H = window.innerHeight;
+const svg = d3.select('#graph').append('svg').attr('width',W).attr('height',H);
+const defs = svg.append('defs');
+
+// Filters
+const glow = defs.append('filter').attr('id','glow').attr('x','-50%').attr('y','-50%').attr('width','200%').attr('height','200%');
+glow.append('feGaussianBlur').attr('stdDeviation','5').attr('result','blur');
+glow.append('feMerge').append('feMergeNode').attr('in','blur');
+glow.append('feMerge').append('feMergeNode').attr('in','SourceGraphic');
+
+// Background
+const pat = defs.append('pattern').attr('id','bgP').attr('width',60).attr('height',60).attr('patternUnits','userSpaceOnUse');
+pat.append('circle').attr('cx',30).attr('cy',30).attr('r',0.8).attr('fill','rgba(255,255,255,0.03)');
+
+LAYERS.forEach((layer,i)=>{
+  const g=defs.append('linearGradient').attr('id',`layerBg${i}`).attr('x1','0%').attr('y1','0%').attr('x2','0%').attr('y2','100%');
+  g.append('stop').attr('offset','0%').attr('stop-color',layer.color).attr('stop-opacity',0.04);
+  g.append('stop').attr('offset','100%').attr('stop-color',layer.color).attr('stop-opacity',0.01);
+});
+
+const mainG = svg.append('g');
+mainG.append('rect').attr('x',-W).attr('y',-H).attr('width',W*3).attr('height',H*3).attr('fill','url(#bgP)');
+
+const zoom = d3.zoom().scaleExtent([0.4,2.5]).on('zoom',(e)=>mainG.attr('transform',e.transform));
+svg.call(zoom); svg.call(zoom.transform, d3.zoomIdentity.translate(W/2,H/2));
+
+// Layer positions
+const LAYER_Y = {};
+LAYERS.forEach((layer,i)=>{ LAYER_Y[layer.id]=(layer.yRatio-0.5)*H*0.85; });
+
+// Layer backgrounds
+LAYERS.forEach((layer,i)=>{
+  mainG.append('rect').attr('x',-W*0.7).attr('y',LAYER_Y[layer.id]-75).attr('width',W*1.4).attr('height',150).attr('fill',`url(#layerBg${i})`).attr('rx',8).attr('opacity',0.6);
+  mainG.append('text').text(`${layer.id} · ${layer.label}`).attr('x',-W*0.42).attr('y',LAYER_Y[layer.id]+5).attr('text-anchor','middle').attr('fill',layer.color).attr('font-size','13px').attr('font-weight','600').attr('letter-spacing','4px').attr('opacity',0.5);
+  if(i>0){
+    mainG.append('line').attr('x1',-W*0.45).attr('x2',W*0.45).attr('y1',LAYER_Y[layer.id]-85).attr('y2',LAYER_Y[layer.id]-85).attr('stroke','rgba(255,255,255,0.04)').attr('stroke-width',1).attr('stroke-dasharray','6,4');
+  }
+});
+
+// Flow arrows
+for(let i=0;i<LAYERS.length-1;i++){
+  const y1=LAYER_Y[LAYERS[i].id]+82, y2=LAYER_Y[LAYERS[i+1].id]-82;
+  mainG.append('line').attr('x1',0).attr('x2',0).attr('y1',y1).attr('y2',y2).attr('stroke','rgba(255,255,255,0.06)').attr('stroke-width',1).attr('stroke-dasharray','3,5');
+  mainG.append('polygon').attr('points','-4,-4 4,-4 0,4').attr('fill','rgba(255,255,255,0.08)').attr('transform',`translate(0,${y2})`);
+}
+
+// Links
+const linkGroup = mainG.append('g').attr('class','links');
+const linkElements = linkGroup.selectAll('line').data(allLinks).join('line')
+  .attr('stroke', l => {
+    if(l.type==='cross'){
+      const src=nodeById[l.source.id||l.source], tgt=nodeById[l.target.id||l.target];
+      if(src&&tgt){ const c1=d3.color(src.layerColor), c2=d3.color(tgt.layerColor); return d3.interpolateRgb(c1,c2)(0.5); }
+      return 'rgba(255,255,255,0.15)';
+    } return 'rgba(255,255,255,0.04)';
+  })
+  .attr('stroke-width', l=>l.type==='cross'?1.2:0.5)
+  .attr('stroke-dasharray', l=>l.type==='cross'?'5,4':'2,3')
+  .attr('opacity', l=>l.type==='cross'?0.35:0.15);
+
+// Nodes
+const nodeGroup = mainG.append('g').attr('class','nodes');
+const allNodeElements = [];
+allNodes.forEach(d => {
+  const layer=LAYERS[d.layerIndex];
+  const el = nodeGroup.append('g').datum(d).attr('class',`node-${d.layerId}`).attr('cursor','pointer');
+  el.append('circle').attr('r',9).attr('fill',d.layerColor).attr('opacity',0.9).attr('stroke','rgba(255,255,255,0.15)').attr('stroke-width',1.2).attr('filter','url(#glow)');
+  el.append('circle').attr('r',4).attr('fill','#fff').attr('opacity',0.25).attr('cx',-3).attr('cy',-3);
+  el.append('text').text(d.id).attr('dx',15).attr('dy','0.35em').attr('fill','rgba(255,255,255,0.8)').attr('font-size','12px').attr('font-weight','500').attr('letter-spacing','1px').attr('style','text-shadow:0 0 12px rgba(0,0,0,0.95);pointer-events:none;');
+  allNodeElements.push(el);
+});
+
+// Force simulation
+const sim = d3.forceSimulation(allNodes)
+  .force('charge', d3.forceManyBody().strength(-250))
+  .force('collide', d3.forceCollide(22))
+  .force('link', d3.forceLink(allLinks).id(d=>d.id).distance(l=>l.type==='cross'?160:50).strength(l=>l.type==='cross'?0.04:0.01));
+
+sim.force('layerY', alpha => {
+  allNodes.forEach(d=>{const ty=LAYER_Y[d.layerId];d.y+=(ty-d.y)*0.08*alpha;d.vy*=0.9;});
+});
+sim.force('xSpread', alpha => {
+  LAYERS.forEach(layer=>{
+    const nodes=allNodes.filter(d=>d.layerId===layer.id);
+    if(nodes.length<2)return;
+    const spacing=Math.min(W*0.55/nodes.length,80);
+    const totalW=spacing*(nodes.length-1);
+    nodes.sort((a,b)=>a.nodeIndex-b.nodeIndex);
+    nodes.forEach((d,i)=>{const tx=-totalW/2+i*spacing;d.x+=(tx-d.x)*0.05*alpha;});
+  });
+});
+
+sim.on('tick',()=>{
+  linkElements.attr('x1',d=>d.source.x).attr('y1',d=>d.source.y).attr('x2',d=>d.target.x).attr('y2',d=>d.target.y);
+  allNodeElements.forEach(el=>{const d=el.datum();el.attr('transform',`translate(${d.x},${d.y})`);});
+});
+
+// Interaction
+const tooltip = d3.select('#tooltip');
+const tipName = tooltip.select('.name'), tipGroup = tooltip.select('.group'), tipBadge = tooltip.select('.badge');
+
+function setupInteraction(selection){
+  selection.on('mouseenter',function(event,d){
+    d3.select(this).select('circle').transition().duration(200).attr('r',13).attr('stroke-width',2);
+    tipName.text(d.id); tipGroup.text(d.desc||'');
+    const bc=d.layerId==='上游'?'upstream':d.layerId==='中游'?'midstream':'downstream';
+    tipBadge.text(d.layerId+' · '+d.layerLabel).attr('class',`badge ${bc}`);
+    tipBadge.style('background',d=>`rgba(${parseInt(d.layerColor.slice(1,3),16)},${parseInt(d.layerColor.slice(3,5),16)},${parseInt(d.layerColor.slice(5,7),16)},0.15)`).style('color',d.layerColor).style('border',`1px solid ${d.layerColor}33`);
+    tooltip.classed('visible',true).style('left',(event.clientX+20)+'px').style('top',(event.clientY-25)+'px');
+    linkElements.attr('opacity',l=>{const s=l.source.id||l.source,t=l.target.id||l.target;return(s===d.id||t===d.id)?0.8:0.06;}).attr('stroke-width',l=>{const s=l.source.id||l.source,t=l.target.id||l.target;return(s===d.id||t===d.id)?2.5:0.5;});
+    allNodeElements.forEach(function(n){if(n.id===d.id)return;const connected=allLinks.some(l=>{const s=l.source.id||l.source,t=l.target.id||l.target;return(s===n.id&&t===d.id)||(t===n.id&&s===d.id);});d3.select(this).select('circle').attr('opacity',connected?1:0.15);d3.select(this).select('text').attr('opacity',connected?1:0.15);});
+  }).on('mousemove',function(event){tooltip.style('left',(event.clientX+20)+'px').style('top',(event.clientY-25)+'px');})
+  .on('mouseleave',function(){
+    d3.select(this).select('circle').transition().duration(300).attr('r',9).attr('stroke-width',1.2);
+    tooltip.classed('visible',false);
+    linkElements.attr('opacity',l=>l.type==='cross'?0.35:0.15).attr('stroke-width',l=>l.type==='cross'?1.2:0.5);
+    allNodeElements.forEach(function(n){d3.select(this).select('circle').attr('opacity',0.9);d3.select(this).select('text').attr('opacity',1);});
+  });
+}
+allNodeElements.forEach(el=>{setupInteraction(el);});
+
+// Drag
+const drag = d3.drag().subject(()=>sim.find(d3.event.x,d3.event.y,30))
+  .on('start',(event,d)=>{if(!event.active)sim.alphaTarget(0.3).restart();d.fx=d.x;d.fy=d.y;})
+  .on('drag',(event,d)=>{d.fx=event.x;d.fy=event.y;})
+  .on('end',(event,d)=>{if(!event.active)sim.alphaTarget(0);setTimeout(()=>{d.fx=null;d.fy=null;},2000);});
+allNodeElements.forEach(el=>el.call(drag));
+
+// Stats
+document.getElementById('nodeCount').textContent = LAYERS.map(l=>`${l.id} ${l.nodes.length}`).join(' · ')+` · 总计 ${allNodes.length} 个节点`;
+document.getElementById('linkCount').textContent = `产业关联 ${allLinks.filter(l=>l.type==='cross').length} 条`;
+
+// Settle
+setTimeout(()=>{sim.alphaTarget(0).stop();sim.tick(20);svg.transition().duration(600).call(zoom.transform,d3.zoomIdentity.translate(W/2,H/2));},3500);
+
+// Resize
+window.addEventListener('resize',()=>{location.reload();});
+console.log(`✅ 产业链图谱已加载 · ${LAYERS.map(l=>`${l.id}:${l.nodes.length}`).join(' · ')} · 关联${allLinks.filter(l=>l.type==='cross').length}条`);
+</script>
+</body>
+</html>

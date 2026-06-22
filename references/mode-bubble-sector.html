@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>战略价值气泡图</title>
+<script src="https://d3js.org/d3.v7.min.js">
+</script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #070A15; font-family: 'PingFang SC','Microsoft YaHei','Noto Sans SC',-apple-system,BlinkMacSystemFont,sans-serif; overflow: hidden; color: #fff; user-select: none; }
+#app { width: 100vw; height: 100vh; position: relative; }
+#header { position: absolute; top: 18px; left: 50%; transform: translateX(-50%); text-align: center; z-index: 20; pointer-events: none; }
+#header h1 { font-size: 26px; font-weight: 700; letter-spacing: 3px; background: linear-gradient(135deg,#60A5FA 0%,#A78BFA 40%,#60A5FA 100%); background-size: 200% 200%; -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; animation: shimmer 4s ease-in-out infinite; }
+@keyframes shimmer { 0%,100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
+#header .subtitle { font-size: 12px; color: rgba(255,255,255,0.35); letter-spacing: 4px; margin-top: 2px; }
+#header .subtitle span { color: rgba(96,165,250,0.5); }
+#tooltip { position: absolute; z-index: 100; background: rgba(7,10,21,0.94); backdrop-filter: blur(14px); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 16px 22px; pointer-events: none; opacity: 0; transition: opacity 0.25s; box-shadow: 0 12px 48px rgba(0,0,0,0.7); min-width: 180px; max-width: 280px; }
+#tooltip.visible { opacity: 1; }
+#tooltip .name { font-size: 16px; font-weight: 600; color: #fff; letter-spacing: 1px; }
+#tooltip .layer { font-size: 11px; letter-spacing: 2px; margin-top: 2px; }
+#tooltip .scores { margin-top: 10px; }
+#tooltip .score-row { display: flex; justify-content: space-between; font-size: 12px; padding: 3px 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
+#tooltip .score-row:last-child { border-bottom: none; }
+#tooltip .score-row .label { color: rgba(255,255,255,0.45); }
+#tooltip .score-row .value { color: rgba(255,255,255,0.85); font-weight: 500; display: flex; align-items: center; gap: 6px; }
+#tooltip .score-row .bar-bg { width: 60px; height: 4px; background: rgba(255,255,255,0.08); border-radius: 2px; display: inline-block; }
+#tooltip .score-row .bar-fill { height: 100%; border-radius: 2px; display: block; }
+#legend { position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%); display: flex; gap: 28px; z-index: 15; pointer-events: none; }
+.legend-item { display: flex; align-items: center; gap: 8px; font-size: 12px; color: rgba(255,255,255,0.6); letter-spacing: 1px; }
+.legend-dot { width: 12px; height: 12px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.1); }
+#stats { position: absolute; bottom: 60px; right: 24px; z-index: 10; text-align: right; pointer-events: none; opacity: 0.3; }
+#stats div { font-size: 11px; color: rgba(255,255,255,0.4); letter-spacing: 1px; line-height: 1.5; }
+@media (max-width: 768px) { #header h1 { font-size: 18px; letter-spacing: 1px; } #header .subtitle { font-size: 10px; } #legend { gap: 14px; } .legend-item { font-size: 10px; } }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="header">
+    <h1 id="pageTitle">战略价值气泡图</h1>
+    <div class="subtitle" id="pageSubtitle">WHERE THE VALUE IS · <span>增长 × 利润 × 壁垒</span></div>
+  </div>
+  <div id="graph"></div>
+  <div id="legend"></div>
+  <div id="stats"><div id="infoText"></div></div>
+  <div id="tooltip"><div class="name"></div><div class="layer"></div><div class="scores"></div></div>
+</div>
+
+<script>
+// ====================================================================
+//  ✏️ 在此编辑数据 — 板块价值气泡图（四象限评估）
+//  数据格式说明：
+//    DATA: 评估对象数组 [{ id, group, color, growth, profit, moat, desc }]
+//      id: 板块/赛道名称, group: 分组名（用于图例）, color: 分组色值
+//      growth: 增长潜力 (0-100), profit: 利润水平 (0-100), moat: 竞争壁垒 (0-100)
+//      desc: 一句话评估依据
+//    SPLIT: 象限分割线坐标 { x, y }（默认 52,52）
+//    QUADRANT_LABELS: 四象限标签（可自定义）
+//    GOLDEN_THRESHOLD: 黄金标的阈值 { growth, profit }（默认 60,60）
+// ====================================================================
+
+const DATA = [
+  // ============ 🔵 上游·基础层 ============
+  { id: 'AI训练芯片',   group: '上游·基础层', color: '#60A5FA', growth: 92, profit: 88, moat: 95, desc: 'GPU/NPU训练芯片，NVIDIA垄断>70%毛利率，供不应求' },
+  { id: 'AI推理芯片',   group: '上游·基础层', color: '#60A5FA', growth: 88, profit: 78, moat: 82, desc: '边缘AI爆发，定制化芯片需求旺盛' },
+  { id: '智算中心',     group: '上游·基础层', color: '#60A5FA', growth: 90, profit: 35, moat: 70, desc: '大规模AI算力基础设施，重资产低利润' },
+  { id: '云计算平台',   group: '上游·基础层', color: '#60A5FA', growth: 80, profit: 72, moat: 85, desc: 'AWS/Azure/阿里云，规模效应显著' },
+  { id: '数据要素',     group: '上游·基础层', color: '#60A5FA', growth: 75, profit: 45, moat: 40, desc: '数据采集/标注/交易，竞争分散' },
+  { id: '5G/6G通信',   group: '上游·基础层', color: '#60A5FA', growth: 55, profit: 40, moat: 90, desc: '通信基础设施，国家垄断格局' },
+  { id: '光模块',       group: '上游·基础层', color: '#60A5FA', growth: 82, profit: 55, moat: 55, desc: '800G光互联，受益AI数据中心' },
+  { id: '半导体设备',   group: '上游·基础层', color: '#60A5FA', growth: 78, profit: 82, moat: 92, desc: '光刻机/刻蚀等，极高技术壁垒' },
+  { id: '先进封装',     group: '上游·基础层', color: '#60A5FA', growth: 85, profit: 65, moat: 70, desc: 'Chiplet/3D封装，后摩尔时代关键' },
+
+  // ============ 🟣 中游·技术层 ============
+  { id: '大语言模型',   group: '中游·技术层', color: '#A78BFA', growth: 95, profit: 30, moat: 70, desc: 'GPT/Claude，价格战激烈，烧钱换市场规模' },
+  { id: '多模态模型',   group: '中游·技术层', color: '#A78BFA', growth: 90, profit: 35, moat: 65, desc: '文生图/视频，技术快速迭代，商业化初期' },
+  { id: 'AI智能体',     group: '中游·技术层', color: '#A78BFA', growth: 93, profit: 58, moat: 50, desc: 'Agent新范式崛起，变现能力较强但门槛较低' },
+  { id: '计算机视觉',   group: '中游·技术层', color: '#A78BFA', growth: 55, profit: 60, moat: 45, desc: '成熟技术，竞争充分' },
+  { id: '自然语言处理', group: '中游·技术层', color: '#A78BFA', growth: 60, profit: 55, moat: 40, desc: '传统NLP被大模型重构' },
+  { id: '机器学习框架', group: '中游·技术层', color: '#A78BFA', growth: 40, profit: 20, moat: 35, desc: '开源免费，社区驱动' },
+  { id: '向量数据库',   group: '中游·技术层', color: '#A78BFA', growth: 78, profit: 65, moat: 50, desc: 'RAG基础设施，Pinecone/Weaviate' },
+  { id: '模型压缩',     group: '中游·技术层', color: '#A78BFA', growth: 72, profit: 50, moat: 40, desc: '量化/蒸馏，边缘部署刚需' },
+  { id: 'AI安全对齐',   group: '中游·技术层', color: '#A78BFA', growth: 88, profit: 78, moat: 75, desc: 'AI安全/红队/对齐，监管趋严，专业人才稀缺' },
+
+  // ============ 🟢 下游·应用层 ============
+  { id: 'AI+医疗',     group: '下游·应用层', color: '#34D399', growth: 85, profit: 75, moat: 80, desc: 'AI制药+影像，FDA监管高壁垒' },
+  { id: 'AI+金融',     group: '下游·应用层', color: '#34D399', growth: 80, profit: 82, moat: 78, desc: '风控+量化投顾，牌照+合规壁垒' },
+  { id: 'AI+制造',     group: '下游·应用层', color: '#34D399', growth: 72, profit: 55, moat: 50, desc: '工业质检+数字孪生，场景碎片化' },
+  { id: 'AI+自动驾驶', group: '下游·应用层', color: '#34D399', growth: 78, profit: 15, moat: 88, desc: 'L4无人驾驶，烧钱长跑' },
+  { id: 'AI+内容创作', group: '下游·应用层', color: '#34D399', growth: 92, profit: 62, moat: 35, desc: 'AIGC/视频生成，门槛低竞争激烈' },
+  { id: 'AI+教育',     group: '下游·应用层', color: '#34D399', growth: 70, profit: 58, moat: 45, desc: '个性化学习，政策敏感' },
+  { id: 'AI+机器人',   group: '下游·应用层', color: '#34D399', growth: 88, profit: 48, moat: 78, desc: '具身智能+人形机器人，软硬一体' },
+  { id: 'AI+科学',     group: '下游·应用层', color: '#34D399', growth: 72, profit: 30, moat: 65, desc: 'AI for Science，长期价值导向' },
+  { id: 'AI+编程',     group: '下游·应用层', color: '#34D399', growth: 90, profit: 80, moat: 55, desc: 'Copilot/Cursor，付费意愿强' },
+  { id: 'AI+安全',     group: '下游·应用层', color: '#34D399', growth: 82, profit: 72, moat: 70, desc: 'AI威胁检测，需求刚性' },
+  { id: 'AI+营销',     group: '下游·应用层', color: '#34D399', growth: 75, profit: 65, moat: 30, desc: '推荐+广告，数据壁垒为主' },
+];
+
+// ---- 配置参数（可自定义）----
+const PAGE_CONFIG = {
+  title: 'AI产业链 · 战略价值气泡图',
+  subtitle: 'WHERE THE MONEY IS · ',
+  subtitleHighlight: '增长 × 利润 × 壁垒 三维评估',
+};
+
+// 象限分割线坐标
+const SPLIT = { x: 52, y: 52 };
+
+// 四象限标签（可根据行业修改）
+const QUADRANT_LABELS = [
+  { x: (52+100)/2, y: (100+52)/2, big: '🥇 黄金赛道', small: '高增长·高利润·投资首选', color: 'rgba(255,215,0,0.5)', opacity: 0.12 },
+  { x: (5+52)/2,   y: (100+52)/2, big: '🔬 未来之星',  small: '高增长·待变现·需耐心', color: 'rgba(96,165,250,0.3)', opacity: 0.08 },
+  { x: (52+100)/2, y: (52+5)/2,   big: '🐄 现金牛',    small: '稳定盈利·增长放缓·防守型', color: 'rgba(52,211,153,0.3)', opacity: 0.08 },
+  { x: (5+52)/2,   y: (52+5)/2,   big: '⚰️ 价值陷阱',  small: '低增长·低利润·谨慎进入', color: 'rgba(255,100,100,0.25)', opacity: 0.06 },
+];
+
+// 黄金标的阈值
+const GOLDEN_THRESHOLD = { growth: 60, profit: 60 };
+
+// ====================================================================
+//  以下代码无需修改 — 通用的四象限气泡渲染引擎
+// ====================================================================
+
+document.getElementById('pageTitle').textContent = PAGE_CONFIG.title;
+document.getElementById('pageSubtitle').innerHTML = PAGE_CONFIG.subtitle + '<span>' + PAGE_CONFIG.subtitleHighlight + '</span>';
+
+// Dimensions
+const margin = { top: 80, right: 60, bottom: 70, left: 70 };
+const W = window.innerWidth, H = window.innerHeight;
+
+const svg = d3.select('#graph').append('svg').attr('width',W).attr('height',H);
+const defs = svg.append('defs');
+
+// Glow
+const glow = defs.append('filter').attr('id','bubbleGlow').attr('x','-30%').attr('y','-30%').attr('width','160%').attr('height','160%');
+glow.append('feGaussianBlur').attr('stdDeviation','3').attr('result','blur');
+glow.append('feMerge').append('feMergeNode').attr('in','blur');
+glow.append('feMerge').append('feMergeNode').attr('in','SourceGraphic');
+
+// Background
+const bgGrad = defs.append('linearGradient').attr('id','bgGrad').attr('x1','0%').attr('y1','0%').attr('x2','0%').attr('y2','100%');
+bgGrad.append('stop').attr('offset','0%').attr('stop-color','#0A0E20');
+bgGrad.append('stop').attr('offset','100%').attr('stop-color','#070A15');
+svg.append('rect').attr('width',W).attr('height',H).attr('fill','url(#bgGrad)');
+
+const pat = defs.append('pattern').attr('id','bgPat').attr('width',40).attr('height',40).attr('patternUnits','userSpaceOnUse');
+pat.append('circle').attr('cx',20).attr('cy',20).attr('r',0.5).attr('fill','rgba(255,255,255,0.03)');
+svg.append('rect').attr('width',W).attr('height',H).attr('fill','url(#bgPat)');
+
+// Scales
+const xScale = d3.scaleLinear().domain([5,100]).range([margin.left, W-margin.right]);
+const yScale = d3.scaleLinear().domain([5,100]).range([H-margin.bottom, margin.top]);
+const rScale = d3.scaleSqrt().domain([20,100]).range([10,38]);
+
+// Grid
+[20,40,60,80].forEach(v=>{
+  svg.append('line').attr('x1',xScale(v)).attr('x2',xScale(v)).attr('y1',yScale(5)).attr('y2',yScale(100)).attr('stroke','rgba(255,255,255,0.03)').attr('stroke-width',1);
+  svg.append('line').attr('y1',yScale(v)).attr('y2',yScale(v)).attr('x1',xScale(5)).attr('x2',xScale(100)).attr('stroke','rgba(255,255,255,0.03)').attr('stroke-width',1);
+});
+
+const midX = xScale(SPLIT.x), midY = yScale(SPLIT.y);
+svg.append('line').attr('x1',midX).attr('x2',midX).attr('y1',yScale(5)).attr('y2',yScale(100)).attr('stroke','rgba(255,255,255,0.06)').attr('stroke-dasharray','6,4').attr('stroke-width',1);
+svg.append('line').attr('y1',midY).attr('y2',midY).attr('x1',xScale(5)).attr('x2',xScale(100)).attr('stroke','rgba(255,255,255,0.06)').attr('stroke-dasharray','6,4').attr('stroke-width',1);
+
+// Axis titles
+svg.append('text').text('利润水平  →').attr('x',W/2).attr('y',H-12).attr('text-anchor','middle').attr('fill','rgba(255,255,255,0.3)').attr('font-size','13px').attr('letter-spacing','3px').attr('font-weight','300');
+svg.append('text').text('增长潜力  →').attr('y',H/2).attr('x',12).attr('text-anchor','middle').attr('fill','rgba(255,255,255,0.3)').attr('font-size','13px').attr('letter-spacing','3px').attr('font-weight','300').attr('transform',`rotate(-90,12,${H/2})`);
+
+[20,40,60,80].forEach(v=>{
+  svg.append('text').text(`${v}`).attr('x',xScale(v)).attr('y',H-margin.bottom+20).attr('text-anchor','middle').attr('fill','rgba(255,255,255,0.2)').attr('font-size','10px');
+  svg.append('text').text(`${v}`).attr('y',yScale(v)).attr('x',margin.left-16).attr('text-anchor','end').attr('dominant-baseline','middle').attr('fill','rgba(255,255,255,0.2)').attr('font-size','10px');
+});
+
+// Quadrant labels
+QUADRANT_LABELS.forEach(q=>{
+  const g=svg.append('g').attr('opacity',q.opacity);
+  g.append('text').text(q.big).attr('x',xScale(q.x)).attr('y',yScale(q.y)-12).attr('text-anchor','middle').attr('fill',q.color).attr('font-size','28px').attr('font-weight','700').attr('letter-spacing','4px');
+  g.append('text').text(q.small).attr('x',xScale(q.x)).attr('y',yScale(q.y)+12).attr('text-anchor','middle').attr('fill',q.color).attr('font-size','13px').attr('font-weight','300').attr('letter-spacing','2px');
+});
+
+// Bubbles
+const tooltip = d3.select('#tooltip');
+const tipName = tooltip.select('.name'), tipLayer = tooltip.select('.layer'), tipScores = tooltip.select('.scores');
+
+const bubbles = svg.append('g').attr('class','bubbles');
+const els = bubbles.selectAll('g').data(DATA).join('g').attr('cursor','pointer');
+
+els.append('circle').attr('class','glow-ring').attr('r',d=>rScale(d.moat)+4).attr('fill',d=>d.color).attr('opacity',0.08).attr('filter','url(#bubbleGlow)');
+els.append('circle').attr('class','bubble').attr('r',d=>rScale(d.moat)).attr('fill',d=>d.color).attr('opacity',0.65).attr('stroke',d=>d.color).attr('stroke-width',2).attr('stroke-opacity',0.4);
+els.append('circle').attr('class','highlight').attr('r',d=>rScale(d.moat)*0.3).attr('fill','#fff').attr('opacity',0.2).attr('cx',d=>-rScale(d.moat)*0.25).attr('cy',d=>-rScale(d.moat)*0.25);
+els.append('text').text(d=>d.id).attr('dx',0).attr('dy',d=>rScale(d.moat)+15).attr('text-anchor','middle').attr('fill','rgba(255,255,255,0.7)').attr('font-size','11px').attr('font-weight','500').attr('letter-spacing','1px').attr('style','text-shadow:0 0 10px rgba(0,0,0,0.95);pointer-events:none;');
+els.attr('transform',d=>`translate(${xScale(d.profit)},${yScale(d.growth)})`);
+
+// Golden highlight
+const golden = DATA.filter(d=>d.growth>=GOLDEN_THRESHOLD.growth&&d.profit>=GOLDEN_THRESHOLD.profit);
+golden.forEach(d=>{
+  const idx=DATA.indexOf(d);
+  els.filter((_,i)=>i===idx).select('.bubble').attr('stroke','#FFD700').attr('stroke-opacity',0.5).attr('stroke-width',2.5).attr('opacity',0.8);
+});
+
+// Interaction
+els.on('mouseenter',function(event,d){
+  const el=d3.select(this);
+  el.select('.bubble').transition().duration(200).attr('opacity',1).attr('r',rScale(d.moat)*1.12);
+  el.select('.glow-ring').transition().duration(200).attr('opacity',0.2).attr('r',rScale(d.moat)+8);
+  el.raise();
+  tipName.text(d.id); tipLayer.text(d.group).style('color',d.color);
+  const bar=(v)=>{const w=Math.round(v/100*60);const c=v>=70?'#34D399':v>=45?'#F9CA24':'#FF6B6B';return `<span class="bar-bg"><span class="bar-fill" style="width:${w}px;background:${c}"></span></span>`;};
+  tipScores.html(`<div class="score-row"><span class="label">📈 增长潜力</span><span class="value">${d.growth}/100 ${bar(d.growth)}</span></div><div class="score-row"><span class="label">💰 利润水平</span><span class="value">${d.profit}/100 ${bar(d.profit)}</span></div><div class="score-row"><span class="label">🏰 竞争壁垒</span><span class="value">${d.moat}/100 ${bar(d.moat)}</span></div><div style="margin-top:6px;font-size:11px;color:rgba(255,255,255,0.35);border-top:1px solid rgba(255,255,255,0.06);padding-top:6px">${d.desc}</div>`);
+  tooltip.classed('visible',true).style('left',Math.min(event.clientX+20,W-300)+'px').style('top',Math.max(event.clientY-150,10)+'px');
+  els.filter(function(){return this!==el.node();}).select('.bubble').transition().duration(200).attr('opacity',0.2);
+  els.filter(function(){return this!==el.node();}).select('text').transition().duration(200).attr('opacity',0.2);
+}).on('mousemove',function(event){tooltip.style('left',Math.min(event.clientX+20,W-300)+'px').style('top',Math.max(event.clientY-150,10)+'px');})
+.on('mouseleave',function(){
+  tooltip.classed('visible',false);
+  els.select('.bubble').transition().duration(300).attr('opacity',d=>(d.growth>=GOLDEN_THRESHOLD.growth&&d.profit>=GOLDEN_THRESHOLD.profit)?0.8:0.65).attr('r',d=>rScale(d.moat));
+  els.select('.glow-ring').transition().duration(300).attr('opacity',0.08).attr('r',d=>rScale(d.moat)+4);
+  els.select('text').transition().duration(300).attr('opacity',1);
+});
+
+// Legend
+const legend = d3.select('#legend');
+const groups = [...new Set(DATA.map(d=>d.group))];
+const groupColors = {}; DATA.forEach(d=>{groupColors[d.group]=d.color;});
+groups.forEach(g=>{legend.append('div').attr('class','legend-item').html(`<div class="legend-dot" style="background:${groupColors[g]}"></div><span>${g}</span>`);});
+
+// Stats
+document.getElementById('infoText').textContent = `共计 ${DATA.length} 个板块 · 上方=高增长 右侧=高利润 气泡大=高壁垒`;
+
+// Resize
+window.addEventListener('resize',()=>{location.reload();});
+
+console.log(`✅ 战略价值气泡图已加载 · ${DATA.length}个板块 · 🥇黄金赛道: ${golden.map(d=>d.id).join(', ')}`);
+</script>
+</body>
+</html>
