@@ -57,7 +57,7 @@ function buildScoreTip(d, groupColor = '#94A3B8') {
     ${hasScores ? `
       <div style="border-top:1px solid rgba(255,255,255,0.06);padding-top:6px">
         ${d.growth !== undefined ? scoreBar('📈 增长潜力', d.growth) : ''}
-        ${d.profit !== undefined ? scoreBar('💰 利润水平', d.profit) : ''}
+        ${d.profit !== undefined ? scoreBar('💰 盈利能力', d.profit) : ''}
         ${d.moat !== undefined ? scoreBar('🏰 竞争壁垒', d.moat) : ''}
       </div>
     ` : ''}
@@ -188,7 +188,7 @@ function bubbleScale(minR = 10, maxR = 38) {
 /**
  * 判断是否为龙头标的（高增长+高利润）——用于金色描边
  * @param {number} growth — 增长潜力
- * @param {number} profit — 利润水平
+ * @param {number} profit — 盈利能力
  * @param {number} threshold — 阈值，默认 60
  * @returns {boolean}
  *

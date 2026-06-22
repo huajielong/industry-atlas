@@ -63,7 +63,7 @@ body { background: #070A15; font-family: 'PingFang SC','Microsoft YaHei','Noto S
 //  数据格式说明：
 //    DATA: 公司/标的数组 [{ id, group, color, growth, profit, moat, desc }]
 //      id: 公司名, group: 赛道/分组, color: 品牌色值（重要！每家单独的颜色）
-//      growth: 增长潜力, profit: 利润水平, moat: 竞争壁垒 (均0-100)
+//      growth: 增长潜力, profit: 盈利能力, moat: 竞争壁垒 (均0-100)
 //      desc: 投资逻辑（核心竞争力+当前状态+风险提示）
 //    SPLIT: 象限分割线 { x, y }
 //    QUADRANT_LABELS: 四象限标签（标的版命名）
@@ -175,7 +175,7 @@ const midX=xScale(SPLIT.x), midY=yScale(SPLIT.y);
 svg.append('line').attr('x1',midX).attr('x2',midX).attr('y1',yScale(10)).attr('y2',yScale(100)).attr('stroke','rgba(255,255,255,0.06)').attr('stroke-dasharray','6,4').attr('stroke-width',1);
 svg.append('line').attr('y1',midY).attr('y2',midY).attr('x1',xScale(10)).attr('x2',xScale(100)).attr('stroke','rgba(255,255,255,0.06)').attr('stroke-dasharray','6,4').attr('stroke-width',1);
 
-svg.append('text').text('利润水平  →').attr('x',W/2).attr('y',H-14).attr('text-anchor','middle').attr('fill','rgba(255,255,255,0.25)').attr('font-size','12px').attr('letter-spacing','3px').attr('font-weight','300');
+svg.append('text').text('盈利能力  →').attr('x',W/2).attr('y',H-14).attr('text-anchor','middle').attr('fill','rgba(255,255,255,0.25)').attr('font-size','12px').attr('letter-spacing','3px').attr('font-weight','300');
 svg.append('text').text('增长潜力  →').attr('y',H/2).attr('x',12).attr('text-anchor','middle').attr('fill','rgba(255,255,255,0.25)').attr('font-size','12px').attr('letter-spacing','3px').attr('font-weight','300').attr('transform',`rotate(-90,12,${H/2})`);
 
 [20,40,60,80].forEach(v=>{
@@ -212,7 +212,7 @@ els.on('mouseenter',function(event,d){
   el.raise();
   tipName.text(d.id); tipGroup.text(d.group).style('color',d.color);
   const bar=(v)=>{const w=Math.round(v/100*60);const c=v>=70?'#34D399':v>=45?'#F9CA24':'#FF6B6B';return `<span class="bar-bg"><span class="bar-fill" style="width:${w}px;background:${c}"></span></span>`;};
-  tipScores.html(`<div class="score-row"><span class="label">📈 增长潜力</span><span class="value">${d.growth}/100${bar(d.growth)}</span></div><div class="score-row"><span class="label">💰 利润水平</span><span class="value">${d.profit}/100${bar(d.profit)}</span></div><div class="score-row"><span class="label">🏰 竞争壁垒</span><span class="value">${d.moat}/100${bar(d.moat)}</span></div>`);
+  tipScores.html(`<div class="score-row"><span class="label">📈 增长潜力</span><span class="value">${d.growth}/100${bar(d.growth)}</span></div><div class="score-row"><span class="label">💰 盈利能力</span><span class="value">${d.profit}/100${bar(d.profit)}</span></div><div class="score-row"><span class="label">🏰 竞争壁垒</span><span class="value">${d.moat}/100${bar(d.moat)}</span></div>`);
   tipDesc.text(d.desc);
   tooltip.classed('visible',true).style('left',Math.min(event.clientX+20,W-320)+'px').style('top',Math.max(event.clientY-180,10)+'px');
   els.filter(function(){return this!==el.node();}).select('.bubble').transition().duration(200).attr('opacity',0.15);

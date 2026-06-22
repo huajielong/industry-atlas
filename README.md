@@ -59,7 +59,7 @@ L1: See the big picture   →  L2: Understand the chain   →  L3: Find the best
 |:-----|:-------|:--------------------|:--------------|
 | **L1 Panorama** 🗺️ | Radial ring | "What's the overall ecosystem of this industry?" | 1 center + N clusters + M sub-items, cross-cluster links |
 | **L2 Chain** 🔗 | Vertical layered | "What's the upstream→midstream→downstream structure?" | 2-4 layers, 6-15 nodes per layer, flow arrows |
-| **L3 Sector Bubble** 💎 | 4-quadrant scatter | "Which sectors are most profitable?" | Growth↑ × Profit→ × Moat(area), golden leaders highlighted |
+| **L3 Sector Bubble** 💎 | 4-quadrant scatter | "Which sectors are most profitable?" | Growth↑ × Profitability→ × Moat(area), golden leaders highlighted |
 | **L4 Company Bubble** 🏢 | 4-quadrant + brand colors | "Which companies to invest in?" | Same as L3 + brand colors, golden edge for leaders, breadcrumb |
 
 Each mode has a **complete reference template** (250-430 lines) in `references/`, ready to customize for any industry.
@@ -103,7 +103,7 @@ git clone https://github.com/huajielong/industry-atlas.git ~/.codex/skills/indus
 ### Pure Methodology (No Installation)
 Even without installation, you can share the workflow with any AI:
 
-> *"You are an industry analysis visualization expert. Generate an interactive D3.js HTML analysis for [industry name]. Use 4 progressive modes: L1 radial panorama, L2 layered chain, L3 4-quadrant sector bubble, L4 4-quadrant company bubble. Each with growth×profit×moat scoring. Deep tech dark theme."*
+> *"You are an industry analysis visualization expert. Generate an interactive D3.js HTML analysis for [industry name]. Use 4 progressive modes: L1 radial panorama, L2 layered chain, L3 4-quadrant sector bubble (Y-axis: growth potential, X-axis: profitability, area: competitive moat), L4 4-quadrant company bubble. Deep tech dark theme."*
 
 ---
 
@@ -129,7 +129,7 @@ Even without installation, you can share the workflow with any AI:
 Open it in browser → interact with the chart → share with your team.
 
 ### Customization
-- **Scores**: Provide your own growth/profit/moat data, or let the AI score based on industry knowledge
+- **Scores**: Provide your own growth/profitability/moat data, or let the AI score based on industry knowledge
 - **Colors**: Title gradient auto-adapts to the industry (AI=blue-purple, new energy=green-gold, chips=orange-red, biotech=blue-green)
 - **Labels**: Quadrant names are fully customizable (e.g., "🥇 Golden Sector" → "🎯 Strategic Priority")
 - **Data**: Add/remove nodes, clusters, or companies freely — the layout auto-adjusts
