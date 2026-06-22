@@ -43,6 +43,8 @@ Instead of describing what it does, here's what it **already made** in 5 minutes
 | 🏢 L4 Company Bubble | 4-quadrant + brand colors | NEV Companies (8 brands, all brand colors) |
 
 > **No external dependencies** except D3.js (CDN-loaded). Output is a single `.html` file — open in browser, share with your team, embed in reports.
+>
+> 📁 **See the [`demos/`](./demos) directory for all 4 modes with real data!**
 
 ---
 

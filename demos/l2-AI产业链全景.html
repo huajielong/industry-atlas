@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI产业链全景图谱 · 上中下游</title>
+<script src="https://d3js.org/d3.v7.min.js">
+</script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: #070A15;
+  font-family: 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif;
+  overflow: hidden;
+  color: #fff;
+  user-select: none;
+}
+
+#app {
+  width: 100vw;
+  height: 100vh;
+  position: relative;
+}
+
+/* ---- Header ---- */
+#header {
+  position: absolute;
+  top: 22px;
+  left: 50%;
+  transform: translateX(-50%);
+  text-align: center;
+  z-index: 20;
+  pointer-events: none;
+}
+#header h1 {
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: 4px;
+  background: linear-gradient(135deg, #60A5FA 0%, #A78BFA 40%, #60A5FA 100%);
+  background-size: 200% 200%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: shimmer 4s ease-in-out infinite;
+}
+@keyframes shimmer {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+#header .subtitle {
+  font-size: 13px;
+  color: rgba(255,255,255,0.4);
+  letter-spacing: 6px;
+  margin-top: 4px;
+  font-weight: 300;
+}
+#header .subtitle span { color: rgba(96,165,250,0.6); }
+
+/* ---- Tooltip ---- */
+#tooltip {
+  position: absolute;
+  z-index: 100;
+  background: rgba(7,10,21,0.92);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 10px;
+  padding: 14px 20px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.6);
+  min-width: 140px;
+  text-align: center;
+}
+#tooltip.visible { opacity: 1; }
+#tooltip .name { font-size: 16px; font-weight: 600; color: #fff; }
+#tooltip .group { font-size: 12px; color: rgba(255,255,255,0.4); margin-top: 4px; letter-spacing: 2px; }
+#tooltip .badge {
+  display: inline-block;
+  padding: 2px 14px;
+  border-radius: 20px;
+  font-size: 11px;
+  margin-top: 6px;
+  letter-spacing: 2px;
+}
+#tooltip .badge.upstream   { background: rgba(96,165,250,0.15); color: #60A5FA; border: 1px solid rgba(96,165,250,0.3); }
+#tooltip .badge.midstream  { background: rgba(167,139,250,0.15); color: #A78BFA; border: 1px solid rgba(167,139,250,0.3); }
+#tooltip .badge.downstream { background: rgba(52,211,153,0.15); color: #34D399; border: 1px solid rgba(52,211,153,0.3); }
+
+/* ---- Stats ---- */
+#stats {
+  position: absolute;
+  bottom: 30px;
+  right: 28px;
+  z-index: 10;
+  text-align: right;
+  pointer-events: none;
+  opacity: 0.35;
+}
+#stats div { font-size: 11px; color: rgba(255,255,255,0.4); letter-spacing: 1px; line-height: 1.6; }
+
+/* ---- Responsive ---- */
+@media (max-width: 768px) {
+  #header h1 { font-size: 20px; letter-spacing: 2px; }
+  #header .subtitle { font-size: 10px; letter-spacing: 3px; }
+  #stats { display: none; }
+}
+@media (max-width: 480px) {
+  #header h1 { font-size: 16px; letter-spacing: 1px; }
+  #header { top: 14px; }
+}
+</style>
+</head>
+<body>
+
+<div id="app">
+  <div id="header">
+    <h1>AI产业链全景图谱</h1>
+    <div class="subtitle">ARTIFICIAL INTELLIGENCE INDUSTRY CHAIN · <span>从基础层到应用层</span></div>
+  </div>
+
+  <div id="graph"></div>
+
+  <div id="stats">
+    <div id="nodeCount"></div>
+    <div id="linkCount"></div>
+  </div>
+
+  <div id="tooltip">
+    <div class="name"></div>
+    <div class="group"></div>
+    <div class="badge"></div>
+  </div>
+</div>
+
+<script>
+// ====================================================================
+//  DATA — AI产业链 上-中-下游
+// ====================================================================
+
+const LAYERS = [
+  {
+    id: '上游',
+    label: '基础层',
+    labelEn: 'INFRASTRUCTURE',
+    color: '#60A5FA',
+    desc: '算力·数据·网络 — AI的硬件与数据基础',
+    yRatio: 0.22,
+    nodes: [
+      { id: 'AI训练芯片',       desc: 'GPU/NPU/TPU等大模型训练专用芯片' },
+      { id: 'AI推理芯片',       desc: '边缘端/终端低功耗推理芯片' },
+      { id: '智算中心',         desc: '大规模AI算力集群基础设施' },
+      { id: '云计算平台',       desc: 'AWS/Azure/阿里云等云服务' },
+      { id: '数据采集',         desc: '多模态数据获取与清洗' },
+      { id: '数据标注',         desc: '人工+AI辅助数据标注服务' },
+      { id: '数据交易',         desc: '数据要素市场化流通平台' },
+      { id: '5G/6G通信',       desc: '高带宽低延迟通信网络' },
+      { id: '光模块',           desc: '高速光互联关键器件' },
+      { id: '半导体设备',       desc: '芯片制造关键装备' },
+      { id: '先进封装',         desc: 'Chiplet/3D封装等先进封装技术' },
+    ],
+  },
+  {
+    id: '中游',
+    label: '技术层',
+    labelEn: 'TECHNOLOGY',
+    color: '#A78BFA',
+    desc: '模型·算法·框架 — AI核心技术栈',
+    yRatio: 0.50,
+    nodes: [
+      { id: '大语言模型',       desc: 'GPT/Claude/文心/通义等基础大模型' },
+      { id: '多模态模型',       desc: '文本+图像+视频+音频统一建模' },
+      { id: '计算机视觉',       desc: '图像识别/目标检测/视频理解' },
+      { id: '自然语言处理',     desc: '语音识别/机器翻译/情感分析' },
+      { id: '机器学习框架',     desc: 'PyTorch/TensorFlow/PaddlePaddle' },
+      { id: 'AI智能体',         desc: '自主决策与执行的AI Agent' },
+      { id: '模型压缩',         desc: '量化/蒸馏/剪枝等轻量化技术' },
+      { id: '提示工程',         desc: 'Prompt设计/优化/管理' },
+      { id: 'AI安全对齐',       desc: '价值观对齐/安全护栏/红队测试' },
+      { id: '开源模型生态',     desc: 'Llama/Mistral/千问等开源社区' },
+      { id: '向量数据库',       desc: 'RAG架构核心基础设施' },
+    ],
+  },
+  {
+    id: '下游',
+    label: '应用层',
+    labelEn: 'APPLICATION',
+    color: '#34D399',
+    desc: '场景·产品·服务 — AI赋能千行百业',
+    yRatio: 0.78,
+    nodes: [
+      { id: 'AI+医疗',         desc: 'AI制药/医学影像/辅助诊断' },
+      { id: 'AI+金融',         desc: '智能风控/量化交易/智能投顾' },
+      { id: 'AI+制造',         desc: '工业质检/预测性维护/数字孪生' },
+      { id: 'AI+自动驾驶',     desc: 'L4/L5无人驾驶/车路协同' },
+      { id: 'AI+内容创作',     desc: 'AIGC/视频生成/数字人/音乐创作' },
+      { id: 'AI+教育',         desc: '个性化学习/智能辅导/自适应评测' },
+      { id: 'AI+机器人',       desc: '具身智能/人形机器人/协作机器人' },
+      { id: 'AI+科学',         desc: 'AlphaFold/AI for Science/材料发现' },
+      { id: 'AI+编程',         desc: 'Copilot/Cursor/Devin等AI编程助手' },
+      { id: 'AI+安全',         desc: 'AI驱动的威胁检测/漏洞挖掘' },
+      { id: 'AI+营销',         desc: '智能推荐/广告投放优化/用户画像' },
+    ],
+  },
+];
+
+// Cross-layer connections: [sourceId, targetId]
+const CROSS_LINKS = [
+  // 上游 → 中游
+  ['AI训练芯片',     '大语言模型'],
+  ['AI训练芯片',     '多模态模型'],
+  ['AI推理芯片',     '计算机视觉'],
+  ['智算中心',       '大语言模型'],
+  ['云计算平台',     '机器学习框架'],
+  ['数据采集',       '大语言模型'],
+  ['数据标注',       '计算机视觉'],
+  ['数据交易',       '自然语言处理'],
+  ['5G/6G通信',     'AI智能体'],
+  ['先进封装',       'AI训练芯片'],
+  ['半导体设备',     'AI推理芯片'],
+  // 中游 → 下游
+  ['大语言模型',     'AI+编程'],
+  ['大语言模型',     'AI+营销'],
+  ['大语言模型',     'AI+教育'],
+  ['多模态模型',     'AI+内容创作'],
+  ['计算机视觉',     'AI+自动驾驶'],
+  ['计算机视觉',     'AI+制造'],
+  ['自然语言处理',   'AI+医疗'],
+  ['AI智能体',       'AI+机器人'],
+  ['AI智能体',       'AI+金融'],
+  ['机器学习框架',   'AI+科学'],
+  ['模型压缩',       'AI+机器人'],
+  ['AI安全对齐',     'AI+安全'],
+  ['向量数据库',     'AI+营销'],
+  ['开源模型生态',   'AI+编程'],
+  ['提示工程',       'AI+教育'],
+  // 上游 → 下游 (直接赋能)
+  ['云计算平台',     'AI+内容创作'],
+  ['5G/6G通信',     'AI+自动驾驶'],
+  ['AI推理芯片',     'AI+机器人'],
+  ['智算中心',       'AI+科学'],
+];
+
+// ====================================================================
+//  BUILD GRAPH DATA
+// ====================================================================
+
+const allNodes = [];
+const nodeById = {};
+const allLinks = [];
+
+LAYERS.forEach((layer, li) => {
+  layer.nodes.forEach((n, ni) => {
+    const node = {
+      id: n.id,
+      desc: n.desc,
+      layerId: layer.id,
+      layerIndex: li,
+      layerLabel: layer.label,
+      layerEn: layer.labelEn,
+      layerColor: layer.color,
+      nodeIndex: ni,
+      totalInLayer: layer.nodes.length,
+    };
+    allNodes.push(node);
+    nodeById[n.id] = node;
+  });
+});
+
+for (const [s, t] of CROSS_LINKS) {
+  if (nodeById[s] && nodeById[t]) {
+    allLinks.push({ source: s, target: t, type: 'cross' });
+  }
+}
+
+// Intra-layer sequential links
+LAYERS.forEach(layer => {
+  for (let i = 0; i < layer.nodes.length - 1; i++) {
+    allLinks.push({ source: layer.nodes[i].id, target: layer.nodes[i + 1].id, type: 'intra' });
+  }
+});
+
+// ====================================================================
+//  SETUP SVG
+// ====================================================================
+
+const container = document.getElementById('graph');
+const width = window.innerWidth;
+const height = window.innerHeight;
+
+const svg = d3.select('#graph')
+  .append('svg')
+  .attr('width', width)
+  .attr('height', height);
+
+const defs = svg.append('defs');
+
+// Glow filter
+const glow = defs.append('filter')
+  .attr('id', 'glow').attr('x', '-50%').attr('y', '-50%')
+  .attr('width', '200%').attr('height', '200%');
+glow.append('feGaussianBlur').attr('stdDeviation', '5').attr('result', 'blur');
+glow.append('feMerge').append('feMergeNode').attr('in', 'blur');
+glow.append('feMerge').append('feMergeNode').attr('in', 'SourceGraphic');
+
+// Strong glow
+const sglow = defs.append('filter')
+  .attr('id', 'sglow').attr('x', '-100%').attr('y', '-100%')
+  .attr('width', '300%').attr('height', '300%');
+sglow.append('feGaussianBlur').attr('stdDeviation', '10').attr('result', 'blur');
+sglow.append('feMerge').append('feMergeNode').attr('in', 'blur');
+sglow.append('feMerge').append('feMergeNode').attr('in', 'SourceGraphic');
+
+// Background pattern
+const pat = defs.append('pattern')
+  .attr('id', 'bgP').attr('width', 60).attr('height', 60)
+  .attr('patternUnits', 'userSpaceOnUse');
+pat.append('circle').attr('cx', 30).attr('cy', 30).attr('r', 0.8).attr('fill', 'rgba(255,255,255,0.03)');
+
+// Layer background gradients
+LAYERS.forEach((layer, i) => {
+  const g = defs.append('linearGradient')
+    .attr('id', `layerBg${i}`)
+    .attr('x1', '0%').attr('y1', '0%').attr('x2', '0%').attr('y2', '100%');
+  g.append('stop').attr('offset', '0%').attr('stop-color', layer.color).attr('stop-opacity', 0.04);
+  g.append('stop').attr('offset', '100%').attr('stop-color', layer.color).attr('stop-opacity', 0.01);
+});
+
+// ====================================================================
+//  MAIN GROUP
+// ====================================================================
+
+const g = svg.append('g');
+
+g.append('rect')
+  .attr('x', -width).attr('y', -height)
+  .attr('width', width * 3).attr('height', height * 3)
+  .attr('fill', 'url(#bgP)');
+
+const zoom = d3.zoom()
+  .scaleExtent([0.4, 2.5])
+  .on('zoom', (event) => { g.attr('transform', event.transform); });
+svg.call(zoom);
+svg.call(zoom.transform, d3.zoomIdentity.translate(width / 2, height / 2));
+
+// ====================================================================
+//  LAYER BACKGROUND ZONES & DECORATIONS
+// ====================================================================
+
+const LAYER_Y = {};
+LAYERS.forEach((layer, i) => {
+  LAYER_Y[layer.id] = (layer.yRatio - 0.5) * height * 0.85;
+});
+
+LAYERS.forEach((layer, i) => {
+  // Zone bg
+  g.append('rect')
+    .attr('x', -width * 0.7)
+    .attr('y', LAYER_Y[layer.id] - 75)
+    .attr('width', width * 1.4)
+    .attr('height', 150)
+    .attr('fill', `url(#layerBg${i})`)
+    .attr('rx', 8)
+    .attr('opacity', 0.6);
+
+  // Layer label
+  g.append('text')
+    .text(`${layer.id} · ${layer.label}`)
+    .attr('x', -width * 0.42)
+    .attr('y', LAYER_Y[layer.id] + 5)
+    .attr('text-anchor', 'middle')
+    .attr('fill', layer.color)
+    .attr('font-size', '13px')
+    .attr('font-weight', '600')
+    .attr('letter-spacing', '4px')
+    .attr('opacity', 0.5);
+
+  // Separator
+  if (i > 0) {
+    g.append('line')
+      .attr('x1', -width * 0.45)
+      .attr('x2', width * 0.45)
+      .attr('y1', LAYER_Y[layer.id] - 85)
+      .attr('y2', LAYER_Y[layer.id] - 85)
+      .attr('stroke', 'rgba(255,255,255,0.04)')
+      .attr('stroke-width', 1)
+      .attr('stroke-dasharray', '6,4');
+  }
+});
+
+// Flow arrows between layers
+for (let i = 0; i < LAYERS.length - 1; i++) {
+  const y1 = LAYER_Y[LAYERS[i].id] + 82;
+  const y2 = LAYER_Y[LAYERS[i + 1].id] - 82;
+  g.append('line')
+    .attr('x1', 0).attr('x2', 0)
+    .attr('y1', y1).attr('y2', y2)
+    .attr('stroke', 'rgba(255,255,255,0.06)')
+    .attr('stroke-width', 1)
+    .attr('stroke-dasharray', '3,5');
+  g.append('polygon')
+    .attr('points', '-4,-4 4,-4 0,4')
+    .attr('fill', 'rgba(255,255,255,0.08)')
+    .attr('transform', `translate(0, ${y2})`);
+}
+
+// ====================================================================
+//  RENDER LINKS
+// ====================================================================
+
+const linkGroup = g.append('g').attr('class', 'links');
+
+const linkElements = linkGroup.selectAll('line')
+  .data(allLinks)
+  .join('line')
+  .attr('stroke', l => {
+    if (l.type === 'cross') {
+      const src = nodeById[l.source.id || l.source];
+      const tgt = nodeById[l.target.id || l.target];
+      if (src && tgt) {
+        const c1 = d3.color(src.layerColor);
+        const c2 = d3.color(tgt.layerColor);
+        return d3.interpolateRgb(c1, c2)(0.5);
+      }
+      return 'rgba(255,255,255,0.15)';
+    }
+    return 'rgba(255,255,255,0.04)';
+  })
+  .attr('stroke-width', l => l.type === 'cross' ? 1.2 : 0.5)
+  .attr('stroke-dasharray', l => l.type === 'cross' ? '5,4' : '2,3')
+  .attr('opacity', l => l.type === 'cross' ? 0.35 : 0.15);
+
+// ====================================================================
+//  RENDER NODES
+// ====================================================================
+
+const nodeGroup = g.append('g').attr('class', 'nodes');
+
+const layerGroups = {};
+LAYERS.forEach(layer => {
+  layerGroups[layer.id] = nodeGroup.append('g').attr('class', `layer-${layer.id}`);
+});
+
+const allNodeElements = [];
+allNodes.forEach(d => {
+  const layer = LAYERS[d.layerIndex];
+  const el = layerGroups[layer.id].append('g')
+    .datum(d)
+    .attr('class', `node-${d.layerId}`)
+    .attr('cursor', 'pointer');
+
+  el.append('circle')
+    .attr('r', 9)
+    .attr('fill', d.layerColor)
+    .attr('opacity', 0.9)
+    .attr('stroke', 'rgba(255,255,255,0.15)')
+    .attr('stroke-width', 1.2)
+    .attr('filter', 'url(#glow)');
+
+  el.append('circle')
+    .attr('r', 4)
+    .attr('fill', '#fff')
+    .attr('opacity', 0.25)
+    .attr('cx', -3).attr('cy', -3);
+
+  el.append('text')
+    .text(d.id)
+    .attr('dx', 15)
+    .attr('dy', '0.35em')
+    .attr('fill', 'rgba(255,255,255,0.8)')
+    .attr('font-size', '12px')
+    .attr('font-weight', '500')
+    .attr('letter-spacing', '1px')
+    .attr('style', 'text-shadow: 0 0 12px rgba(0,0,0,0.95); pointer-events: none;');
+
+  allNodeElements.push(el);
+});
+
+// ====================================================================
+//  FORCE SIMULATION
+// ====================================================================
+
+const simulation = d3.forceSimulation(allNodes)
+  .force('charge', d3.forceManyBody().strength(-250))
+  .force('collide', d3.forceCollide(22))
+  .force('link', d3.forceLink(allLinks)
+    .id(d => d.id)
+    .distance(l => { if (l.type === 'cross') return 160; return 50; })
+    .strength(l => { if (l.type === 'cross') return 0.04; return 0.01; })
+  );
+
+// Layer Y constraint
+simulation.force('layerY', alpha => {
+  allNodes.forEach(d => {
+    const targetY = LAYER_Y[d.layerId];
+    d.y += (targetY - d.y) * 0.08 * alpha;
+    d.vy *= 0.9;
+  });
+});
+
+// X spread within layers
+simulation.force('xSpread', alpha => {
+  LAYERS.forEach(layer => {
+    const nodes = allNodes.filter(d => d.layerId === layer.id);
+    if (nodes.length < 2) return;
+    const spacing = Math.min(width * 0.55 / nodes.length, 80);
+    const totalW = spacing * (nodes.length - 1);
+    nodes.sort((a, b) => a.nodeIndex - b.nodeIndex);
+    nodes.forEach((d, i) => {
+      const tx = -totalW / 2 + i * spacing;
+      d.x += (tx - d.x) * 0.05 * alpha;
+    });
+  });
+});
+
+// ====================================================================
+//  TICK
+// ====================================================================
+
+simulation.on('tick', () => {
+  linkElements
+    .attr('x1', d => d.source.x)
+    .attr('y1', d => d.source.y)
+    .attr('x2', d => d.target.x)
+    .attr('y2', d => d.target.y);
+
+  allNodeElements.forEach(el => {
+    const d = el.datum();
+    el.attr('transform', `translate(${d.x}, ${d.y})`);
+  });
+});
+
+// ====================================================================
+//  INTERACTION
+// ====================================================================
+
+const tooltip = d3.select('#tooltip');
+const tooltipName = tooltip.select('.name');
+const tooltipGroup = tooltip.select('.group');
+const tooltipBadge = tooltip.select('.badge');
+
+function setupNodeInteraction(selection) {
+  selection
+    .on('mouseenter', function(event, d) {
+      d3.select(this).select('circle').transition().duration(200)
+        .attr('r', 13)
+        .attr('stroke-width', 2);
+
+      tooltipName.text(d.id);
+      tooltipGroup.text(d.desc || '');
+      const badgeClass = d.layerId === '上游' ? 'upstream' : d.layerId === '中游' ? 'midstream' : 'downstream';
+      const badgeText = d.layerId + ' · ' + d.layerLabel;
+      tooltipBadge.text(badgeText).attr('class', `badge ${badgeClass}`);
+      tooltip.classed('visible', true)
+        .style('left', (event.clientX + 20) + 'px')
+        .style('top', (event.clientY - 25) + 'px');
+
+      linkElements
+        .attr('opacity', l => {
+          const sid = l.source.id || l.source;
+          const tid = l.target.id || l.target;
+          return (sid === d.id || tid === d.id) ? 0.8 : 0.06;
+        })
+        .attr('stroke-width', l => {
+          const sid = l.source.id || l.source;
+          const tid = l.target.id || l.target;
+          return (sid === d.id || tid === d.id) ? 2.5 : 0.5;
+        });
+      allNodeElements.each(function(n) {
+        if (n.id === d.id) return;
+        const connected = allLinks.some(l => {
+          const sid = l.source.id || l.source;
+          const tid = l.target.id || l.target;
+          return (sid === n.id && tid === d.id) || (tid === n.id && sid === d.id);
+        });
+        d3.select(this).select('circle').attr('opacity', connected ? 1 : 0.15);
+        d3.select(this).select('text').attr('opacity', connected ? 1 : 0.15);
+      });
+    })
+    .on('mousemove', function(event) {
+      tooltip.style('left', (event.clientX + 20) + 'px')
+        .style('top', (event.clientY - 25) + 'px');
+    })
+    .on('mouseleave', function() {
+      d3.select(this).select('circle').transition().duration(300)
+        .attr('r', 9)
+        .attr('stroke-width', 1.2);
+
+      tooltip.classed('visible', false);
+
+      linkElements
+        .attr('opacity', l => l.type === 'cross' ? 0.35 : 0.15)
+        .attr('stroke-width', l => l.type === 'cross' ? 1.2 : 0.5);
+      allNodeElements.each(function(n) {
+        d3.select(this).select('circle').attr('opacity', 0.9);
+        d3.select(this).select('text').attr('opacity', 1);
+      });
+    });
+}
+
+const drag = d3.drag()
+  .subject(() => simulation.find(d3.event.x, d3.event.y, 30))
+  .on('start', function(event, d) {
+    if (!event.active) simulation.alphaTarget(0.3).restart();
+    d.fx = d.x;
+    d.fy = d.y;
+  })
+  .on('drag', (event, d) => {
+    d.fx = event.x;
+    d.fy = event.y;
+  })
+  .on('end', function(event, d) {
+    if (!event.active) simulation.alphaTarget(0);
+    setTimeout(() => { d.fx = null; d.fy = null; }, 2000);
+  });
+
+allNodeElements.forEach(el => {
+  setupNodeInteraction(el);
+  el.call(drag);
+});
+
+// ====================================================================
+//  STATS
+// ====================================================================
+
+document.getElementById('nodeCount').textContent =
+  `上游 ${LAYERS[0].nodes.length} · 中游 ${LAYERS[1].nodes.length} · 下游 ${LAYERS[2].nodes.length}  |  总计 ${allNodes.length} 个节点`;
+document.getElementById('linkCount').textContent =
+  `产业关联 ${allLinks.filter(l => l.type === 'cross').length} 条`;
+
+// ====================================================================
+//  SETTLE & CENTER
+// ====================================================================
+
+setTimeout(() => {
+  simulation.alphaTarget(0).stop();
+  simulation.tick(20);
+  svg.transition().duration(600).call(
+    zoom.transform,
+    d3.zoomIdentity.translate(width / 2, height / 2)
+  );
+}, 3500);
+
+// ====================================================================
+//  RESIZE
+// ====================================================================
+
+window.addEventListener('resize', () => {
+  svg.attr('width', window.innerWidth).attr('height', window.innerHeight);
+});
+
+console.log('✅ AI产业链全景图谱已加载');
+console.log(`📊 上游 ${LAYERS[0].nodes.length} · 中游 ${LAYERS[1].nodes.length} · 下游 ${LAYERS[2].nodes.length} · 关联 ${allLinks.filter(l => l.type === 'cross').length} 条`);
+</script>
+</body>
+</html>
